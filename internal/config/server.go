@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -28,8 +27,14 @@ type ServerConfig struct {
 
 func NewServerConfig() *ServerConfig {
 
+	acrual := &HostAddress{
+		Host: "localhost",
+		Port: 8081,
+	}
+
 	return &ServerConfig{
-		RunAddress: *NewHostAddress(),
+		RunAddress:           *NewHostAddress(),
+		AccrualSystemAddress: *acrual,
 	}
 
 }
@@ -45,6 +50,15 @@ func (se *ServerConfig) Init() {
 	// fmt.Printf("FileStoragePath = %v\n", se.FileStoragePath)
 	// fmt.Printf("Restore = %v\n", se.Restore)
 	// fmt.Printf("Adress = %v\n", se.Address)
+
+	se.paramAccrualSystemAddress = HostAddress{
+		Host: "localhost",
+		Port: 8081,
+	}
+	se.paramRunAddress = HostAddress{
+		Host: "localhost",
+		Port: 8080,
+	}
 
 	flag.Var(&se.paramRunAddress, "a", "Net address host:port")
 	flag.StringVar(&se.paramDatabaseURI, "d", "", "db uri")
@@ -93,8 +107,8 @@ func (se *ServerConfig) Parse() {
 			// fmt.Printf("err.Errors: %v\n\n", err.Errors)
 
 			for _, v := range err.Errors {
-				fmt.Printf("err.Error: %T\n", v)
-				fmt.Printf("err.Error: %v\n", v)
+				//fmt.Printf("err.Error: %T\n", v)
+				//fmt.Printf("err.Error: %v\n", v)
 
 				if err1, ok := v.(env.EmptyVarError); ok {
 					// fmt.Printf("err.EmptyVarError: %v\n", err1)
@@ -129,7 +143,7 @@ func (se *ServerConfig) Parse() {
 		}
 	}
 
-	fmt.Printf("problemVars = %v", problemVars)
+	//fmt.Printf("problemVars = %v", problemVars)
 	flag.Parse()
 
 	// fmt.Println("======FLAG PARSED-----")
@@ -143,7 +157,7 @@ func (se *ServerConfig) Parse() {
 	// fmt.Printf("Adress = %v\n", se.Address)
 
 	_, ok1 := problemVars["ACCRUAL_SYSTEM_ADDRESS"]
-	_, ok2 := problemVars["StoreInterval"]
+	_, ok2 := problemVars["AccrualSystemAddress"]
 	if !ok1 && !ok2 {
 		se.AccrualSystemAddress = se.envs.AccrualSystemAddress
 	} else {

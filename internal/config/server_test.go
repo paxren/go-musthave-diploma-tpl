@@ -35,7 +35,24 @@ func setEnvVars(envVars map[string]string) func() {
 
 // resetFlags сбрасывает флаги командной строки
 func resetFlags() {
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	// Сохраняем тестовые флаги, чтобы избежать ошибок "flag provided but not defined"
+	testFlagSet := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+
+	// Добавляем стандартные тестовые флаги, которые может использовать Go
+	testFlagSet.Bool("test.v", false, "verbose")
+	testFlagSet.Bool("test.run", false, "run only tests matching regexp")
+	testFlagSet.String("test.testlogfile", "", "write test action log to file")
+	testFlagSet.Bool("test.parallel", false, "run tests in parallel")
+	testFlagSet.Int("test.count", 1, "run tests count times")
+	testFlagSet.Int("test.coverprofile", 0, "write coverage profile to file")
+	testFlagSet.String("test.outputdir", "", "write profiles to dir")
+	testFlagSet.String("test.failfast", "", "do not start new tests after first failure")
+	testFlagSet.String("test.short", "", "run smaller test suite to save time")
+	testFlagSet.String("test.timeout", "", "panic test binary after duration")
+	testFlagSet.Bool("test.paniconexit0", false, "panic on call to os.Exit(0)")
+
+	flag.CommandLine = testFlagSet
+	flag.Usage = func() {} // Подавляем вывод usage при ошибках парсинга
 }
 
 // saveArgs сохраняет текущие аргументы командной строки
@@ -99,16 +116,31 @@ func TestNewServerConfig(t *testing.T) {
 			test: func(t *testing.T) {
 				config := NewServerConfig()
 
-				// Проверяем, что все поля инициализированы
-				if config.AccrualSystemAddress.Host != "" || config.AccrualSystemAddress.Port != 0 {
-					t.Errorf("Expected AccrualSystemAddress to be empty, got %s", config.AccrualSystemAddress.String())
+				// Проверяем, что AccrualSystemAddress имеет значения по умолчанию
+				expectedAccrualHost := "localhost"
+				expectedAccrualPort := 8081
+				if config.AccrualSystemAddress.Host != expectedAccrualHost {
+					t.Errorf("Expected AccrualSystemAddress.Host to be %s, got %s", expectedAccrualHost, config.AccrualSystemAddress.Host)
+				}
+				if config.AccrualSystemAddress.Port != expectedAccrualPort {
+					t.Errorf("Expected AccrualSystemAddress.Port to be %d, got %d", expectedAccrualPort, config.AccrualSystemAddress.Port)
+				}
+
+				// Проверяем, что RunAddress имеет значения по умолчанию
+				expectedRunHost := "localhost"
+				expectedRunPort := 8080
+				if config.RunAddress.Host != expectedRunHost {
+					t.Errorf("Expected RunAddress.Host to be %s, got %s", expectedRunHost, config.RunAddress.Host)
+				}
+				if config.RunAddress.Port != expectedRunPort {
+					t.Errorf("Expected RunAddress.Port to be %d, got %d", expectedRunPort, config.RunAddress.Port)
 				}
 
 				if config.DatabaseURI != "" {
 					t.Errorf("Expected DatabaseURI to be empty, got %s", config.DatabaseURI)
 				}
 
-				// Проверяем, что параметр-поля инициализированы нулевыми значениями
+				// Проверяем, что параметр-поля имеют нулевые значения до вызова Init()
 				if config.paramAccrualSystemAddress.Host != "" || config.paramAccrualSystemAddress.Port != 0 {
 					t.Errorf("Expected paramAccrualSystemAddress to be empty, got %s", config.paramAccrualSystemAddress.String())
 				}
@@ -161,24 +193,29 @@ func TestInit(t *testing.T) {
 				// Устанавливаем флаги
 				config.Init()
 
-				// Проверяем начальные значения параметров
-				if config.paramAccrualSystemAddress.Host != "" || config.paramAccrualSystemAddress.Port != 0 {
-					t.Errorf("Expected paramAccrualSystemAddress to be empty, got %s", config.paramAccrualSystemAddress.String())
+				// Проверяем начальные значения параметров после Init()
+				expectedAccrualHost := "localhost"
+				expectedAccrualPort := 8081
+				if config.paramAccrualSystemAddress.Host != expectedAccrualHost {
+					t.Errorf("Expected paramAccrualSystemAddress.Host to be %s, got %s", expectedAccrualHost, config.paramAccrualSystemAddress.Host)
+				}
+				if config.paramAccrualSystemAddress.Port != expectedAccrualPort {
+					t.Errorf("Expected paramAccrualSystemAddress.Port to be %d, got %d", expectedAccrualPort, config.paramAccrualSystemAddress.Port)
 				}
 
 				if config.paramDatabaseURI != "" {
 					t.Errorf("Expected paramDatabaseURI to be empty, got %s", config.paramDatabaseURI)
 				}
 
-				// Проверяем RunAddress (должен иметь нулевые значения, так как флаги еще не установлены)
-				// paramRunAddress - это значение флага, которое будет установлено при парсинге
-				// До парсинга оно имеет нулевые значения
-				if config.paramRunAddress.Host != "" {
-					t.Errorf("Expected paramRunAddress.Host to be empty, got %s", config.paramRunAddress.Host)
+				// Проверяем RunAddress (должен иметь значения по умолчанию после Init())
+				expectedRunHost := "localhost"
+				expectedRunPort := 8080
+				if config.paramRunAddress.Host != expectedRunHost {
+					t.Errorf("Expected paramRunAddress.Host to be %s, got %s", expectedRunHost, config.paramRunAddress.Host)
 				}
 
-				if config.paramRunAddress.Port != 0 {
-					t.Errorf("Expected paramRunAddress.Port to be 0, got %d", config.paramRunAddress.Port)
+				if config.paramRunAddress.Port != expectedRunPort {
+					t.Errorf("Expected paramRunAddress.Port to be %d, got %d", expectedRunPort, config.paramRunAddress.Port)
 				}
 			},
 		},

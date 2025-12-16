@@ -23,3 +23,5 @@ vendor/
 .vscode
 
 metrics/
+main
+gophermart
