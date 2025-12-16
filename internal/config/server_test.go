@@ -100,8 +100,8 @@ func TestNewServerConfig(t *testing.T) {
 				config := NewServerConfig()
 
 				// Проверяем, что все поля инициализированы
-				if config.AccrualSystemAddress != "" {
-					t.Errorf("Expected AccrualSystemAddress to be empty, got %s", config.AccrualSystemAddress)
+				if config.AccrualSystemAddress.Host != "" || config.AccrualSystemAddress.Port != 0 {
+					t.Errorf("Expected AccrualSystemAddress to be empty, got %s", config.AccrualSystemAddress.String())
 				}
 
 				if config.DatabaseURI != "" {
@@ -109,8 +109,8 @@ func TestNewServerConfig(t *testing.T) {
 				}
 
 				// Проверяем, что параметр-поля инициализированы нулевыми значениями
-				if config.paramAccrualSystemAddress != "" {
-					t.Errorf("Expected paramAccrualSystemAddress to be empty, got %s", config.paramAccrualSystemAddress)
+				if config.paramAccrualSystemAddress.Host != "" || config.paramAccrualSystemAddress.Port != 0 {
+					t.Errorf("Expected paramAccrualSystemAddress to be empty, got %s", config.paramAccrualSystemAddress.String())
 				}
 
 				if config.paramDatabaseURI != "" {
@@ -162,8 +162,8 @@ func TestInit(t *testing.T) {
 				config.Init()
 
 				// Проверяем начальные значения параметров
-				if config.paramAccrualSystemAddress != "" {
-					t.Errorf("Expected paramAccrualSystemAddress to be empty, got %s", config.paramAccrualSystemAddress)
+				if config.paramAccrualSystemAddress.Host != "" || config.paramAccrualSystemAddress.Port != 0 {
+					t.Errorf("Expected paramAccrualSystemAddress to be empty, got %s", config.paramAccrualSystemAddress.String())
 				}
 
 				if config.paramDatabaseURI != "" {
@@ -194,18 +194,21 @@ func TestParseWithValidEnvVars(t *testing.T) {
 	tests := []struct {
 		name                   string
 		envVars                map[string]string
-		expectedAccrualAddress string
+		expectedAccrualAddress HostAddress
 		expectedRunAddress     HostAddress
 		expectedDatabaseURI    string
 	}{
 		{
 			name: "Все переменные окружения установлены корректно",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual-system:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "localhost:9000",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			expectedAccrualAddress: "http://accrual-system:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -215,11 +218,14 @@ func TestParseWithValidEnvVars(t *testing.T) {
 		{
 			name: "Переменные с IP-адресом вместо localhost",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://192.168.1.100:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "192.168.1.100:8080",
 				"RUN_ADDRESS":            "192.168.1.100:9000",
 				"DATABASE_URI":           "postgres://user:password@192.168.1.100:5432/dbname",
 			},
-			expectedAccrualAddress: "http://192.168.1.100:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "192.168.1.100",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "192.168.1.100",
 				Port: 9000,
@@ -229,11 +235,14 @@ func TestParseWithValidEnvVars(t *testing.T) {
 		{
 			name: "Разные порты для разных сервисов",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8081",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8081",
 				"RUN_ADDRESS":            "localhost:8082",
 				"DATABASE_URI":           "postgres://user:password@localhost:5433/testdb",
 			},
-			expectedAccrualAddress: "http://accrual:8081",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8081,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 8082,
@@ -256,10 +265,7 @@ func TestParseWithValidEnvVars(t *testing.T) {
 			config.Parse()
 
 			// Проверяем результаты
-			if config.AccrualSystemAddress != tt.expectedAccrualAddress {
-				t.Errorf("Expected AccrualSystemAddress %s, got %s", tt.expectedAccrualAddress, config.AccrualSystemAddress)
-			}
-
+			assertHostAddress(t, tt.expectedAccrualAddress, config.AccrualSystemAddress)
 			assertHostAddress(t, tt.expectedRunAddress, config.RunAddress)
 
 			if config.DatabaseURI != tt.expectedDatabaseURI {
@@ -275,7 +281,7 @@ func TestParseWithFlags(t *testing.T) {
 		name                   string
 		envVars                map[string]string
 		flags                  []string
-		expectedAccrualAddress string
+		expectedAccrualAddress HostAddress
 		expectedRunAddress     HostAddress
 		expectedDatabaseURI    string
 	}{
@@ -287,11 +293,14 @@ func TestParseWithFlags(t *testing.T) {
 				"DATABASE_URI":           "",
 			},
 			flags: []string{
-				"-r", "http://flag-accrual:8080",
+				"-r", "localhost:8080",
 				"-a", "localhost:9000",
 				"-d", "postgres://flag:password@localhost:5432/flagdb",
 			},
-			expectedAccrualAddress: "http://flag-accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -302,11 +311,14 @@ func TestParseWithFlags(t *testing.T) {
 			name:    "Флаги с IP-адресом",
 			envVars: map[string]string{},
 			flags: []string{
-				"-r", "http://192.168.1.100:8080",
+				"-r", "192.168.1.100:8080",
 				"-a", "192.168.1.100:9000",
 				"-d", "postgres://user:password@192.168.1.100:5432/dbname",
 			},
-			expectedAccrualAddress: "http://192.168.1.100:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "192.168.1.100",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "192.168.1.100",
 				Port: 9000,
@@ -316,14 +328,17 @@ func TestParseWithFlags(t *testing.T) {
 		{
 			name: "Частичные флаги",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://env-accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "",
 				"DATABASE_URI":           "postgres://env:password@localhost:5432/envdb",
 			},
 			flags: []string{
 				"-a", "localhost:9000",
 			},
-			expectedAccrualAddress: "http://env-accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -353,10 +368,7 @@ func TestParseWithFlags(t *testing.T) {
 			config.Parse()
 
 			// Проверяем результаты
-			if config.AccrualSystemAddress != tt.expectedAccrualAddress {
-				t.Errorf("Expected AccrualSystemAddress %s, got %s", tt.expectedAccrualAddress, config.AccrualSystemAddress)
-			}
-
+			assertHostAddress(t, tt.expectedAccrualAddress, config.AccrualSystemAddress)
 			assertHostAddress(t, tt.expectedRunAddress, config.RunAddress)
 
 			if config.DatabaseURI != tt.expectedDatabaseURI {
@@ -372,23 +384,26 @@ func TestParsePriority(t *testing.T) {
 		name                   string
 		envVars                map[string]string
 		flags                  []string
-		expectedAccrualAddress string
+		expectedAccrualAddress HostAddress
 		expectedRunAddress     HostAddress
 		expectedDatabaseURI    string
 	}{
 		{
 			name: "Корректные переменные окружения имеют приоритет над флагами",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://env-accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "localhost:9000",
 				"DATABASE_URI":           "postgres://env:password@localhost:5432/envdb",
 			},
 			flags: []string{
-				"-r", "http://flag-accrual:8081",
+				"-r", "localhost:8081",
 				"-a", "localhost:9001",
 				"-d", "postgres://flag:password@localhost:5433/flagdb",
 			},
-			expectedAccrualAddress: "http://env-accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -398,16 +413,19 @@ func TestParsePriority(t *testing.T) {
 		{
 			name: "Некорректные переменные окружения используют флаги",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://env-accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "invalid-address",
 				"DATABASE_URI":           "",
 			},
 			flags: []string{
-				"-r", "http://flag-accrual:8081",
+				"-r", "localhost:8081",
 				"-a", "localhost:9001",
 				"-d", "postgres://flag:password@localhost:5433/flagdb",
 			},
-			expectedAccrualAddress: "http://env-accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9001,
@@ -417,16 +435,19 @@ func TestParsePriority(t *testing.T) {
 		{
 			name: "Смешанный сценарий: часть из env, часть из флагов",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://env-accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				// RUN_ADDRESS отсутствует
 				"DATABASE_URI": "postgres://env:password@localhost:5432/envdb",
 			},
 			flags: []string{
-				"-r", "http://flag-accrual:8081",
+				"-r", "localhost:8081",
 				"-a", "localhost:9001",
 				"-d", "postgres://flag:password@localhost:5433/flagdb",
 			},
-			expectedAccrualAddress: "http://env-accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9001,
@@ -456,10 +477,7 @@ func TestParsePriority(t *testing.T) {
 			config.Parse()
 
 			// Проверяем результаты
-			if config.AccrualSystemAddress != tt.expectedAccrualAddress {
-				t.Errorf("Expected AccrualSystemAddress %s, got %s", tt.expectedAccrualAddress, config.AccrualSystemAddress)
-			}
-
+			assertHostAddress(t, tt.expectedAccrualAddress, config.AccrualSystemAddress)
 			assertHostAddress(t, tt.expectedRunAddress, config.RunAddress)
 
 			if config.DatabaseURI != tt.expectedDatabaseURI {
@@ -475,19 +493,22 @@ func TestParseHostAddressErrors(t *testing.T) {
 		name                   string
 		envVars                map[string]string
 		flags                  []string
-		expectedAccrualAddress string
+		expectedAccrualAddress HostAddress
 		expectedRunAddress     HostAddress
 		expectedDatabaseURI    string
 	}{
 		{
 			name: "Некорректный формат RUN_ADDRESS (без порта)",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "localhost",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-a", "localhost:9000"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-a", "localhost:9000"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -497,12 +518,15 @@ func TestParseHostAddressErrors(t *testing.T) {
 		{
 			name: "Некорректный формат RUN_ADDRESS (невалидный хост)",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "invalid-host:9000",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-a", "localhost:9000"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-a", "localhost:9000"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -512,12 +536,15 @@ func TestParseHostAddressErrors(t *testing.T) {
 		{
 			name: "Некорректный порт в RUN_ADDRESS",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "localhost:invalid",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-a", "localhost:9000"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-a", "localhost:9000"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -527,12 +554,15 @@ func TestParseHostAddressErrors(t *testing.T) {
 		{
 			name: "Множественные двоеточия в RUN_ADDRESS",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "localhost:9000:extra",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-a", "localhost:9000"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-a", "localhost:9000"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -562,10 +592,7 @@ func TestParseHostAddressErrors(t *testing.T) {
 			config.Parse()
 
 			// Проверяем результаты
-			if config.AccrualSystemAddress != tt.expectedAccrualAddress {
-				t.Errorf("Expected AccrualSystemAddress %s, got %s", tt.expectedAccrualAddress, config.AccrualSystemAddress)
-			}
-
+			assertHostAddress(t, tt.expectedAccrualAddress, config.AccrualSystemAddress)
 			assertHostAddress(t, tt.expectedRunAddress, config.RunAddress)
 
 			if config.DatabaseURI != tt.expectedDatabaseURI {
@@ -581,7 +608,7 @@ func TestParseEmptyEnvVars(t *testing.T) {
 		name                   string
 		envVars                map[string]string
 		flags                  []string
-		expectedAccrualAddress string
+		expectedAccrualAddress HostAddress
 		expectedRunAddress     HostAddress
 		expectedDatabaseURI    string
 	}{
@@ -592,8 +619,11 @@ func TestParseEmptyEnvVars(t *testing.T) {
 				"RUN_ADDRESS":            "localhost:9000",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-r", "http://flag-accrual:8080"},
-			expectedAccrualAddress: "http://flag-accrual:8080",
+			flags: []string{"-r", "localhost:8080"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -603,12 +633,15 @@ func TestParseEmptyEnvVars(t *testing.T) {
 		{
 			name: "Пустая переменная DATABASE_URI",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "localhost:9000",
 				"DATABASE_URI":           "",
 			},
-			flags:                  []string{"-d", "postgres://flag:password@localhost:5432/flagdb"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-d", "postgres://flag:password@localhost:5432/flagdb"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -623,11 +656,14 @@ func TestParseEmptyEnvVars(t *testing.T) {
 				"DATABASE_URI":           "",
 			},
 			flags: []string{
-				"-r", "http://flag-accrual:8080",
+				"-r", "localhost:8080",
 				"-a", "localhost:9000",
 				"-d", "postgres://flag:password@localhost:5432/flagdb",
 			},
-			expectedAccrualAddress: "http://flag-accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -637,7 +673,7 @@ func TestParseEmptyEnvVars(t *testing.T) {
 		{
 			name: "Частично пустые переменные окружения",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "",
 				"DATABASE_URI":           "",
 			},
@@ -645,7 +681,10 @@ func TestParseEmptyEnvVars(t *testing.T) {
 				"-a", "localhost:9000",
 				"-d", "postgres://flag:password@localhost:5432/flagdb",
 			},
-			expectedAccrualAddress: "http://accrual:8080",
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -675,10 +714,7 @@ func TestParseEmptyEnvVars(t *testing.T) {
 			config.Parse()
 
 			// Проверяем результаты
-			if config.AccrualSystemAddress != tt.expectedAccrualAddress {
-				t.Errorf("Expected AccrualSystemAddress %s, got %s", tt.expectedAccrualAddress, config.AccrualSystemAddress)
-			}
-
+			assertHostAddress(t, tt.expectedAccrualAddress, config.AccrualSystemAddress)
 			assertHostAddress(t, tt.expectedRunAddress, config.RunAddress)
 
 			if config.DatabaseURI != tt.expectedDatabaseURI {
@@ -694,7 +730,7 @@ func TestParseWithInvalidEnvVars(t *testing.T) {
 		name                   string
 		envVars                map[string]string
 		flags                  []string
-		expectedAccrualAddress string
+		expectedAccrualAddress HostAddress
 		expectedRunAddress     HostAddress
 		expectedDatabaseURI    string
 	}{
@@ -705,8 +741,11 @@ func TestParseWithInvalidEnvVars(t *testing.T) {
 				"RUN_ADDRESS":            "",
 				"DATABASE_URI":           "",
 			},
-			flags:                  []string{"-r", "http://flag-accrual:8080", "-a", "localhost:9000", "-d", "postgres://flag:password@localhost:5432/flagdb"},
-			expectedAccrualAddress: "http://flag-accrual:8080",
+			flags: []string{"-r", "localhost:8080", "-a", "localhost:9000", "-d", "postgres://flag:password@localhost:5432/flagdb"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -716,12 +755,15 @@ func TestParseWithInvalidEnvVars(t *testing.T) {
 		{
 			name: "Некорректный RUN_ADDRESS должен использовать флаг",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				"RUN_ADDRESS":            "invalid-address",
 				"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-a", "localhost:9000"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-a", "localhost:9000"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -731,12 +773,15 @@ func TestParseWithInvalidEnvVars(t *testing.T) {
 		{
 			name: "Отсутствующие переменные окружения должны использовать флаги",
 			envVars: map[string]string{
-				"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+				"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 				// RUN_ADDRESS отсутствует
 				"DATABASE_URI": "postgres://user:password@localhost:5432/dbname",
 			},
-			flags:                  []string{"-a", "localhost:9000"},
-			expectedAccrualAddress: "http://accrual:8080",
+			flags: []string{"-a", "localhost:9000"},
+			expectedAccrualAddress: HostAddress{
+				Host: "localhost",
+				Port: 8080,
+			},
 			expectedRunAddress: HostAddress{
 				Host: "localhost",
 				Port: 9000,
@@ -768,10 +813,7 @@ func TestParseWithInvalidEnvVars(t *testing.T) {
 			config.Parse()
 
 			// Проверяем результаты
-			if config.AccrualSystemAddress != tt.expectedAccrualAddress {
-				t.Errorf("Expected AccrualSystemAddress %s, got %s", tt.expectedAccrualAddress, config.AccrualSystemAddress)
-			}
-
+			assertHostAddress(t, tt.expectedAccrualAddress, config.AccrualSystemAddress)
 			assertHostAddress(t, tt.expectedRunAddress, config.RunAddress)
 
 			if config.DatabaseURI != tt.expectedDatabaseURI {
@@ -798,7 +840,7 @@ func BenchmarkInit(b *testing.B) {
 
 func BenchmarkParseWithEnvVars(b *testing.B) {
 	envVars := map[string]string{
-		"ACCRUAL_SYSTEM_ADDRESS": "http://accrual:8080",
+		"ACCRUAL_SYSTEM_ADDRESS": "localhost:8080",
 		"RUN_ADDRESS":            "localhost:9000",
 		"DATABASE_URI":           "postgres://user:password@localhost:5432/dbname",
 	}
@@ -814,9 +856,72 @@ func BenchmarkParseWithEnvVars(b *testing.B) {
 	}
 }
 
+// Тесты для метода GetAccrualSystemURL
+func TestGetAccrualSystemURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(*ServerConfig)
+		expected string
+	}{
+		{
+			name: "URL с localhost",
+			setup: func(config *ServerConfig) {
+				config.AccrualSystemAddress = HostAddress{
+					Host: "localhost",
+					Port: 8080,
+				}
+			},
+			expected: "http://localhost:8080",
+		},
+		{
+			name: "URL с IP-адресом",
+			setup: func(config *ServerConfig) {
+				config.AccrualSystemAddress = HostAddress{
+					Host: "192.168.1.100",
+					Port: 9000,
+				}
+			},
+			expected: "http://192.168.1.100:9000",
+		},
+		{
+			name: "URL с именем хоста",
+			setup: func(config *ServerConfig) {
+				config.AccrualSystemAddress = HostAddress{
+					Host: "accrual-system",
+					Port: 8080,
+				}
+			},
+			expected: "http://accrual-system:8080",
+		},
+		{
+			name: "URL с другим портом",
+			setup: func(config *ServerConfig) {
+				config.AccrualSystemAddress = HostAddress{
+					Host: "api.accrual",
+					Port: 443,
+				}
+			},
+			expected: "http://api.accrual:443",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := NewServerConfig()
+			tt.setup(config)
+
+			result := config.GetAccrualSystemURL()
+
+			if result != tt.expected {
+				t.Errorf("Expected URL %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
 func BenchmarkParseWithFlags(b *testing.B) {
 	flags := []string{
-		"-r", "http://flag-accrual:8080",
+		"-r", "flag-accrual:8080",
 		"-a", "localhost:9000",
 		"-d", "postgres://flag:password@localhost:5432/flagdb",
 	}
@@ -835,7 +940,7 @@ func BenchmarkParseWithFlags(b *testing.B) {
 
 func BenchmarkParseMixed(b *testing.B) {
 	envVars := map[string]string{
-		"ACCRUAL_SYSTEM_ADDRESS": "http://env-accrual:8080",
+		"ACCRUAL_SYSTEM_ADDRESS": "env-accrual:8080",
 		// RUN_ADDRESS отсутствует
 		"DATABASE_URI": "postgres://env:password@localhost:5432/envdb",
 	}

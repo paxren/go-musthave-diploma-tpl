@@ -4,23 +4,24 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
 )
 
 type ServerConfigEnv struct {
-	AccrualSystemAddress string      `env:"ACCRUAL_SYSTEM_ADDRESS,notEmpty"`
+	AccrualSystemAddress HostAddress `env:"ACCRUAL_SYSTEM_ADDRESS,notEmpty"`
 	RunAddress           HostAddress `env:"RUN_ADDRESS,notEmpty"`
 	DatabaseURI          string      `env:"DATABASE_URI,notEmpty"`
 }
 
 type ServerConfig struct {
 	envs                 ServerConfigEnv
-	AccrualSystemAddress string
+	AccrualSystemAddress HostAddress
 	RunAddress           HostAddress
 	DatabaseURI          string
 
-	paramAccrualSystemAddress string
+	paramAccrualSystemAddress HostAddress
 	paramRunAddress           HostAddress
 	paramDatabaseURI          string
 }
@@ -47,7 +48,7 @@ func (se *ServerConfig) Init() {
 
 	flag.Var(&se.paramRunAddress, "a", "Net address host:port")
 	flag.StringVar(&se.paramDatabaseURI, "d", "", "db uri")
-	flag.StringVar(&se.paramAccrualSystemAddress, "r", "", "Net acrual address host:port")
+	flag.Var(&se.paramAccrualSystemAddress, "r", "Net accrual address host:port")
 
 	// fmt.Println("======AFTER PARAMS PARSE-----")
 	// fmt.Printf("paramStoreInterval = %v\n", se.paramStoreInterval)
@@ -112,8 +113,14 @@ func (se *ServerConfig) Parse() {
 				}
 
 				if _, ok := v.(HostAddressParseError); ok {
-
-					problemVars["RUN_ADDRESS"] = true
+					// Определяем, для какого адреса произошла ошибка
+					// Проверяем, если ошибка связана с RUN_ADDRESS
+					if strings.Contains(v.Error(), "RUN_ADDRESS") {
+						problemVars["RUN_ADDRESS"] = true
+					} else {
+						// Иначе считаем, что ошибка связана с ACCRUAL_SYSTEM_ADDRESS
+						problemVars["ACCRUAL_SYSTEM_ADDRESS"] = true
+					}
 				}
 
 				//fmt.Println("----------------------")
@@ -168,4 +175,9 @@ func (se *ServerConfig) Parse() {
 	// fmt.Printf("FileStoragePath = %v\n", se.FileStoragePath)
 	// fmt.Printf("Restore = %v\n", se.Restore)
 	// fmt.Printf("Adress = %v\n", se.Address)
+}
+
+// GetAccrualSystemURL возвращает полный URL для системы начисления баллов с схемой http
+func (se *ServerConfig) GetAccrualSystemURL() string {
+	return "http://" + se.AccrualSystemAddress.String()
 }
