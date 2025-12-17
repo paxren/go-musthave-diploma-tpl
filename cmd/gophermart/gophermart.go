@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/config"
+	"github.com/paxren/go-musthave-diploma-tpl/internal/handler"
+	"github.com/paxren/go-musthave-diploma-tpl/internal/repository"
 )
 
 var (
@@ -19,4 +23,18 @@ func main() {
 
 	fmt.Println()
 	fmt.Println(serverConfig)
+
+	storage := repository.MakeMemStorage()
+	handlerv := handler.NewHandler(storage)
+	r := chi.NewRouter()
+
+	r.Post(`/api/user/register`, handlerv.RegisterUser)
+	r.Post(`/api/user/login`, handlerv.LoginUser)
+
+	server := &http.Server{
+		Addr:    serverConfig.RunAddress.String(),
+		Handler: r,
+	}
+
+	server.ListenAndServe()
 }
