@@ -191,6 +191,7 @@ func (h Handler) GetOrders(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(ordersJSON)
 }
@@ -216,6 +217,7 @@ func (h Handler) GetBalance(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(balanceJSON)
 }
