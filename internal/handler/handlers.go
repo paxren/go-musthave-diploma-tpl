@@ -131,7 +131,7 @@ func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
 	// 	return
 	// }
 
-	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
+	userHeader := req.Header.Get("User")
 	userDB := h.userRepo.GetUser(userHeader)
 	err = h.orderRepo.AddOrder(*userDB, *models.MakeNewOrder(*userDB, orderString))
 	if err != nil {
@@ -153,7 +153,7 @@ func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
 
 func (h Handler) GetOrders(res http.ResponseWriter, req *http.Request) {
 
-	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
+	userHeader := req.Header.Get("User")
 	userDB := h.userRepo.GetUser(userHeader)
 
 	orders, err := h.orderRepo.GetOrders(*userDB, models.OrderType)
@@ -197,7 +197,7 @@ func (h Handler) GetOrders(res http.ResponseWriter, req *http.Request) {
 
 func (h Handler) GetBalance(res http.ResponseWriter, req *http.Request) {
 
-	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
+	userHeader := req.Header.Get("User")
 	userDB := h.userRepo.GetUser(userHeader)
 
 	balance, err := h.orderRepo.GetBalance(*userDB)
