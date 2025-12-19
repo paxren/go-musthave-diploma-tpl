@@ -25,6 +25,10 @@ func (st *OrderMemStorage) AddOrder(user models.User, order models.Order) error 
 	st.mutex.Lock()
 	defer st.mutex.Unlock()
 
+	if !models.LunaCheck(order.OrderID) {
+		return ErrBadOrderId
+	}
+
 	orders, ok := st.orders[user.Login]
 
 	if !ok {

@@ -16,6 +16,8 @@ var (
 	ErrOrderType = errors.New("неизвестный тип заказа")
 
 	ErrIncafitionFunds = errors.New("недостаточно средств для списания")
+
+	ErrBadOrderId = errors.New("плохой номер заказа (не луноподходящий)")
 )
 
 type UsersBase interface {
