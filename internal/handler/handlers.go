@@ -4,22 +4,33 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"sort"
+	"strconv"
+	"time"
 
 	"github.com/paxren/go-musthave-diploma-tpl/internal/models"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/repository"
 )
 
 type Handler struct {
-	repo repository.UsersBase
+	userRepo  repository.UsersBase
+	orderRepo repository.OrderBase
 
 	//todo переделать!!!
 	//dbConnectionString string
 }
 
-func NewHandler(r repository.UsersBase) *Handler {
+type BalanceExport struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
+}
+
+func NewHandler(users repository.UsersBase, orders repository.OrderBase) *Handler {
 	return &Handler{
-		repo: r,
+		userRepo:  users,
+		orderRepo: orders,
 	}
 }
 
@@ -60,7 +71,7 @@ func (h Handler) RegisterUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err = h.repo.RegisterUser(*user); err != nil {
+	if err = h.userRepo.RegisterUser(*user); err != nil {
 		if errors.Is(err, repository.ErrUserExist) {
 			http.Error(res, "логин уже занят", http.StatusConflict)
 		} else {
@@ -83,7 +94,7 @@ func (h Handler) LoginUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err = h.repo.LoginUser(*user); err != nil {
+	if err = h.userRepo.LoginUser(*user); err != nil {
 		http.Error(res, "не авторизован", http.StatusUnauthorized)
 		return
 	}
@@ -91,6 +102,122 @@ func (h Handler) LoginUser(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Authorization", user.Login)
 
 	res.WriteHeader(http.StatusOK)
+}
+
+func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
+
+	if req.Header.Get("Content-Type") != "text/plain" {
+		http.Error(res, "нужен плейн текст", http.StatusBadRequest)
+		return
+	}
+
+	// Читаем тело запроса
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer req.Body.Close()
+
+	// Преобразуем байты в строку
+	orderString := string(body)
+	// Здесь можно добавить валидацию номера заказа
+	if orderString == "" {
+		http.Error(res, "пустой номер заказа", http.StatusBadRequest)
+		return
+	}
+	orderNumber, err := strconv.ParseUint(orderString, 10, 64)
+	if err != nil {
+		http.Error(res, "неверный формат номера заказа", http.StatusBadRequest)
+		return
+	}
+
+	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
+	userDB := h.userRepo.GetUser(userHeader)
+	err = h.orderRepo.AddOrder(*userDB, *models.MakeNewOrder(*userDB, orderNumber))
+	if err != nil {
+		if errors.Is(err, repository.ErrOrderExistThisUser) {
+			res.WriteHeader(http.StatusOK)
+			return
+		}
+		if errors.Is(err, repository.ErrOrderExistAnotherUser) {
+			http.Error(res, "номер заказа уже был загружен другим пользователем", http.StatusConflict)
+			return
+		}
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+
+	}
+
+	res.WriteHeader(http.StatusAccepted)
+}
+
+func (h Handler) GetOrders(res http.ResponseWriter, req *http.Request) {
+
+	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
+	userDB := h.userRepo.GetUser(userHeader)
+
+	orders, err := h.orderRepo.GetOrders(*userDB, models.OrderType)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(orders) == 0 {
+		res.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	//сразу сортировка по дате
+	sort.Slice(orders, func(i, j int) bool {
+		dateI, errI := time.Parse(time.RFC3339, orders[i].Date)
+		dateJ, errJ := time.Parse(time.RFC3339, orders[j].Date)
+
+		if errI != nil && errJ != nil {
+			return false
+		}
+		if errI != nil {
+			return false
+		}
+		if errJ != nil {
+			return true
+		}
+
+		return dateI.After(dateJ) // от новых к старым
+	})
+
+	ordersJSON, err := json.Marshal(orders)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	res.Write(ordersJSON)
+}
+
+func (h Handler) GetBalance(res http.ResponseWriter, req *http.Request) {
+
+	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
+	userDB := h.userRepo.GetUser(userHeader)
+
+	balance, err := h.orderRepo.GetBalance(*userDB)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	exportBalance := BalanceExport{
+		Current:   (float64(balance.Current) / 100),
+		Withdrawn: (float64(balance.Withdrawn) / 100),
+	}
+
+	balanceJSON, err := json.Marshal(exportBalance)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusOK)
+	res.Write(balanceJSON)
 }
 
 // func (h *Handler) SetDBString(str string) {

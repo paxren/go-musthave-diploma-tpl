@@ -33,7 +33,7 @@ func (m *UserMemStorage) RegisterUser(user models.User) error {
 		return ErrUserExist
 	}
 	id := uint64(len(m.users) + 1)
-	user.ID = &id
+	user.UserID = &id
 	m.users[user.Login] = user
 
 	//todo доработать крайние случаи

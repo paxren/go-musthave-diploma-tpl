@@ -24,12 +24,18 @@ func main() {
 	fmt.Println()
 	fmt.Println(serverConfig)
 
-	userStorage := repository.MakeUserMemStorage()
-	handlerv := handler.NewHandler(userStorage)
+	usersStorage := repository.MakeUserMemStorage()
+	ordersStorage := repository.MakeOrderMemStorage()
+	handlerv := handler.NewHandler(usersStorage, ordersStorage)
 	r := chi.NewRouter()
 
 	r.Post(`/api/user/register`, handlerv.RegisterUser)
 	r.Post(`/api/user/login`, handlerv.LoginUser)
+	r.Post(`/api/user/orders`, handlerv.AddOrder)
+	r.Get(`/api/user/orders`, handlerv.GetOrders)
+	r.Get(`/api/user/balance`, handlerv.GetBalance)
+	// r.Post(`/api/user/balance/withdraw`, handlerv.LoginUser)
+	// r.Get(`/api/user/withdrawals`, handlerv.LoginUser)
 
 	server := &http.Server{
 		Addr:    serverConfig.RunAddress.String(),
