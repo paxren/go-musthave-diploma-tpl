@@ -21,7 +21,7 @@ type User struct {
 }
 
 type Order struct {
-	OrderID uint64 `json:"number"`
+	OrderID string `json:"number"`
 	User    string `json:"-"`
 	Type    string `json:"-"`
 	Status  string `json:"status"`
@@ -43,7 +43,7 @@ type Balance struct {
 	Withdrawn uint64 `json:"withdrawn"`
 }
 
-func MakeNewOrder(user User, orderID uint64) *Order {
+func MakeNewOrder(user User, orderID string) *Order {
 
 	return &Order{
 		OrderID: orderID,
@@ -55,7 +55,7 @@ func MakeNewOrder(user User, orderID uint64) *Order {
 	}
 }
 
-func MakeWithdraw(user User, orderID uint64, sum uint64) *Order {
+func MakeWithdraw(user User, orderID string, sum uint64) *Order {
 
 	return &Order{
 		OrderID: orderID,

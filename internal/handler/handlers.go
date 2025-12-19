@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/paxren/go-musthave-diploma-tpl/internal/models"
@@ -126,15 +125,15 @@ func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "пустой номер заказа", http.StatusBadRequest)
 		return
 	}
-	orderNumber, err := strconv.ParseUint(orderString, 10, 64)
-	if err != nil {
-		http.Error(res, "неверный формат номера заказа", http.StatusBadRequest)
-		return
-	}
+	// orderNumber, err := strconv.ParseUint(orderString, 10, 64)
+	// if err != nil {
+	// 	http.Error(res, "неверный формат номера заказа", http.StatusBadRequest)
+	// 	return
+	// }
 
 	userHeader := req.Header.Get("Authorization") //TODO переделать на заголовок User после добавление мидлвари авторизации
 	userDB := h.userRepo.GetUser(userHeader)
-	err = h.orderRepo.AddOrder(*userDB, *models.MakeNewOrder(*userDB, orderNumber))
+	err = h.orderRepo.AddOrder(*userDB, *models.MakeNewOrder(*userDB, orderString))
 	if err != nil {
 		if errors.Is(err, repository.ErrOrderExistThisUser) {
 			res.WriteHeader(http.StatusOK)
