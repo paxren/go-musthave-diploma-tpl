@@ -143,7 +143,7 @@ func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, "номер заказа уже был загружен другим пользователем", http.StatusConflict)
 			return
 		}
-		if errors.Is(err, repository.ErrBadOrderId) {
+		if errors.Is(err, repository.ErrBadOrderID) {
 			http.Error(res, "плохой номер заказа, нелунуется", http.StatusUnprocessableEntity)
 			return
 		}
