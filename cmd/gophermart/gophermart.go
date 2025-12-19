@@ -24,8 +24,8 @@ func main() {
 	fmt.Println()
 	fmt.Println(serverConfig)
 
-	storage := repository.MakeMemStorage()
-	handlerv := handler.NewHandler(storage)
+	userStorage := repository.MakeUserMemStorage()
+	handlerv := handler.NewHandler(userStorage)
 	r := chi.NewRouter()
 
 	r.Post(`/api/user/register`, handlerv.RegisterUser)

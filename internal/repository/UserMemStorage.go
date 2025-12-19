@@ -6,18 +6,18 @@ import (
 
 // ПОТОКО НЕБЕЗОПАСНО!
 
-type MemStorage struct {
+type UserMemStorage struct {
 	users map[string]models.User
 }
 
-func MakeMemStorage() *MemStorage {
+func MakeUserMemStorage() *UserMemStorage {
 
-	return &MemStorage{
+	return &UserMemStorage{
 		users: make(map[string]models.User),
 	}
 }
 
-func (m *MemStorage) GetUser(login string) *models.User {
+func (m *UserMemStorage) GetUser(login string) *models.User {
 
 	v, ok := m.users[login]
 
@@ -28,10 +28,12 @@ func (m *MemStorage) GetUser(login string) *models.User {
 	return &v
 }
 
-func (m *MemStorage) RegisterUser(user models.User) error {
+func (m *UserMemStorage) RegisterUser(user models.User) error {
 	if m.GetUser(user.Login) != nil {
 		return ErrUserExist
 	}
+	id := uint64(len(m.users) + 1)
+	user.ID = &id
 	m.users[user.Login] = user
 
 	//todo доработать крайние случаи
@@ -40,7 +42,7 @@ func (m *MemStorage) RegisterUser(user models.User) error {
 
 }
 
-func (m *MemStorage) LoginUser(user models.User) error {
+func (m *UserMemStorage) LoginUser(user models.User) error {
 
 	dbUser := m.GetUser(user.Login)
 	if dbUser == nil || (dbUser.Login != user.Login) || (dbUser.Password != user.Password) {
