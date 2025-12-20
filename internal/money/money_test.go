@@ -84,23 +84,23 @@ func TestAccrualToKopecks(t *testing.T) {
 
 			if tt.shouldError {
 				if err == nil {
-					t.Errorf("AccrualToKopecks(%d) ожидал ошибку, но ошибки не было", tt.accrualValue)
+					t.Errorf("AccrualToKopecks(%f) ожидал ошибку, но ошибки не было", tt.accrualValue)
 				}
 				if err != ErrOverflow {
-					t.Errorf("AccrualToKopecks(%d) вернул ошибку %v, ожидалось %v",
+					t.Errorf("AccrualToKopecks(%f) вернул ошибку %v, ожидалось %v",
 						tt.accrualValue, err, ErrOverflow)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Errorf("AccrualToKopecks(%d) вернул неожиданную ошибку: %v",
+				t.Errorf("AccrualToKopecks(%f) вернул неожиданную ошибку: %v",
 					tt.accrualValue, err)
 				return
 			}
 
 			if result != tt.expected {
-				t.Errorf("AccrualToKopecks(%d) = %d; ожидалось %d",
+				t.Errorf("AccrualToKopecks(%f) = %d; ожидалось %d",
 					tt.accrualValue, result, tt.expected)
 			}
 		})
