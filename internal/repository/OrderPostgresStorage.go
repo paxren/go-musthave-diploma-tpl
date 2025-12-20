@@ -230,7 +230,8 @@ func (st *OrderPostgresStorage) GetBalance(user models.User) (*models.Balance, e
 	// Получаем сумму всех заказов и списаний
 	balanceQuery := `
 		SELECT
-			COALESCE(SUM(CASE WHEN type = 'ORDER' THEN value ELSE 0 END), 0) as current,
+			COALESCE(SUM(CASE WHEN type = 'ORDER' THEN value ELSE 0 END), 0) -
+			COALESCE(SUM(CASE WHEN type = 'WITHDRAW' THEN value ELSE 0 END), 0) as current,
 			COALESCE(SUM(CASE WHEN type = 'WITHDRAW' THEN value ELSE 0 END), 0) as withdrawn
 		FROM gophermart_orders
 		WHERE user_id = $1
