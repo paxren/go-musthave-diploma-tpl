@@ -244,3 +244,132 @@ func (st *OrderPostgresStorage) GetBalance(user models.User) (*models.Balance, e
 
 	return &balance, nil
 }
+
+// GetOrdersWithStatuses получает заказы с указанными статусами
+func (st *OrderPostgresStorage) GetOrdersWithStatuses(statuses []string) ([]models.Order, error) {
+	if len(statuses) == 0 {
+		return []models.Order{}, nil
+	}
+
+	// Формируем запрос с использованием IN оператора
+	query := `
+		SELECT id, user_id, type, status, value, created_at
+		FROM gophermart_orders
+		WHERE status = ANY($1)
+		ORDER BY created_at ASC
+	`
+
+	rows, err := st.db.db.Query(query, statuses)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при получении заказов по статусам: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []models.Order
+	for rows.Next() {
+		var order models.Order
+		var userID uint64
+		var createdAt time.Time
+
+		err := rows.Scan(&order.OrderID, &userID, &order.Type, &order.Status, &order.Value, &createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка при сканировании заказа: %w", err)
+		}
+
+		// Получаем логин пользователя по ID
+		var userLogin string
+		userQuery := "SELECT login FROM gophermart_users WHERE id = $1"
+		err = st.db.db.QueryRow(userQuery, userID).Scan(&userLogin)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка при получении логина пользователя: %w", err)
+		}
+
+		// Устанавливаем пользователя и дату
+		order.User = userLogin
+		order.Date = createdAt.Format(time.RFC3339)
+
+		orders = append(orders, order)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при итерации по заказам: %w", err)
+	}
+
+	return orders, nil
+}
+
+// UpdateOrderStatusAndValue обновляет статус и значение заказа
+func (st *OrderPostgresStorage) UpdateOrderStatusAndValue(orderID, status string, value uint64) error {
+	query := `
+		UPDATE gophermart_orders
+		SET status = $1, value = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3
+	`
+
+	result, err := st.db.db.Exec(query, status, value, orderID)
+	if err != nil {
+		return fmt.Errorf("ошибка при обновлении статуса заказа: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка при получении количества обновленных строк: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("заказ с ID %s не найден", orderID)
+	}
+
+	return nil
+}
+
+// GetWithdrawals получает историю выводов средств пользователя
+func (st *OrderPostgresStorage) GetWithdrawals(user models.User) ([]models.Order, error) {
+	// Получаем ID пользователя
+	var userID uint64
+	query := "SELECT id FROM gophermart_users WHERE login = $1"
+	err := st.db.db.QueryRow(query, user.Login).Scan(&userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []models.Order{}, nil
+		}
+		return nil, fmt.Errorf("ошибка при получении ID пользователя: %w", err)
+	}
+
+	// Получаем только операции списания
+	withdrawalsQuery := `
+		SELECT id, type, status, value, created_at
+		FROM gophermart_orders
+		WHERE user_id = $1 AND type = $2
+		ORDER BY created_at DESC
+	`
+
+	rows, err := st.db.db.Query(withdrawalsQuery, userID, models.WithdrawType)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка при получении истории выводов: %w", err)
+	}
+	defer rows.Close()
+
+	var withdrawals []models.Order
+	for rows.Next() {
+		var withdrawal models.Order
+		var createdAt time.Time
+
+		err := rows.Scan(&withdrawal.OrderID, &withdrawal.Type, &withdrawal.Status, &withdrawal.Value, &createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка при сканировании вывода: %w", err)
+		}
+
+		// Устанавливаем пользователя и дату
+		withdrawal.User = user.Login
+		withdrawal.Date = createdAt.Format(time.RFC3339)
+
+		withdrawals = append(withdrawals, withdrawal)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при итерации по выводам: %w", err)
+	}
+
+	return withdrawals, nil
+}
