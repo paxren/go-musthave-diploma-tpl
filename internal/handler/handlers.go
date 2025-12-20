@@ -27,6 +27,15 @@ type BalanceExport struct {
 	Withdrawn float64 `json:"withdrawn"`
 }
 
+type OrderExport struct {
+	OrderID string   `json:"number"`
+	User    string   `json:"-"`
+	Type    string   `json:"-"`
+	Status  string   `json:"status"`
+	Date    string   `json:"uploaded_at"` //TODO может быть переделать на дату всё же?
+	Value   *float64 `json:"accrual,omitempty"`
+}
+
 func NewHandler(users repository.UsersBase, orders repository.OrderBase) *Handler {
 	return &Handler{
 		userRepo:  users,
@@ -189,7 +198,27 @@ func (h Handler) GetOrders(res http.ResponseWriter, req *http.Request) {
 		return dateI.After(dateJ) // от новых к старым
 	})
 
-	ordersJSON, err := json.Marshal(orders)
+	// Преобразуем orders в exportOrders с правильным форматированием поля accrual
+	var exportOrders []OrderExport
+	for _, order := range orders {
+		exportOrder := OrderExport{
+			OrderID: order.OrderID,
+			User:    order.User,
+			Type:    order.Type,
+			Status:  order.Status,
+			Date:    order.Date,
+		}
+
+		// Добавляем поле accrual только если значение не нулевое
+		if order.Value > 0 {
+			accrual := money.KopecksToRubles(order.Value)
+			exportOrder.Value = &accrual
+		}
+
+		exportOrders = append(exportOrders, exportOrder)
+	}
+
+	ordersJSON, err := json.Marshal(exportOrders)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
