@@ -40,8 +40,8 @@ func main() {
 	r.Post(`/api/user/orders`, authMidl.AuthMiddleware(handlerv.AddOrder))
 	r.Get(`/api/user/orders`, authMidl.AuthMiddleware(handlerv.GetOrders))
 	r.Get(`/api/user/balance`, authMidl.AuthMiddleware(handlerv.GetBalance))
-	// r.Post(`/api/user/balance/withdraw`, handlerv.LoginUser)
-	// r.Get(`/api/user/withdrawals`, handlerv.LoginUser)
+	// r.Post(`/api/user/balance/withdraw`, authMidl.AuthMiddleware(handlerv.LoginUser))
+	// r.Get(`/api/user/withdrawals`, authMidl.AuthMiddleware(handlerv.LoginUser))
 
 	server := &http.Server{
 		Addr:    serverConfig.RunAddress.String(),
