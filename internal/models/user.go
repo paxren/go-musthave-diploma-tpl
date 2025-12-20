@@ -61,7 +61,7 @@ func MakeWithdraw(user User, orderID string, sum uint64) *Order {
 		OrderID: orderID,
 		User:    user.Login,
 		Type:    WithdrawType,
-		Status:  OrderStatusNew,
+		Status:  OrderStatusProcessed,
 		Date:    time.Now().Format(time.RFC3339),
 		Value:   sum,
 	}

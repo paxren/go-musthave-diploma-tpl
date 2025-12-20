@@ -61,7 +61,7 @@ func TestRublesToKopecks(t *testing.T) {
 func TestAccrualToKopecks(t *testing.T) {
 	tests := []struct {
 		name         string
-		accrualValue uint64
+		accrualValue float64
 		expected     uint64
 		shouldError  bool
 	}{
@@ -73,6 +73,7 @@ func TestAccrualToKopecks(t *testing.T) {
 		{"10000 рублей", 10000, 1000000, false},
 		{"100000 рублей", 100000, 10000000, false},
 		{"1000000 рублей", 1000000, 100000000, false},
+		{"123.45 рублей", 123.45, 12345, false},
 		{"Максимальное безопасное значение", 18446744073709551, 1844674407370955100, false},
 		{"Значение, вызывающее переполнение", 18446744073709552, 0, true},
 	}

@@ -21,7 +21,7 @@ func RublesToKopecks(rubles float64) uint64 {
 
 // AccrualToKopecks конвертирует значение от accrual системы (в рублях) в копейки
 // с проверкой на переполнение
-func AccrualToKopecks(accrualRubles uint64) (uint64, error) {
+func AccrualToKopecks(accrualRubles float64) (uint64, error) {
 	// Проверяем на переполнение: max uint64 / 100
 	const maxSafeValue = 18446744073709551 // math.MaxUint64 / 100
 
@@ -29,7 +29,7 @@ func AccrualToKopecks(accrualRubles uint64) (uint64, error) {
 		return 0, ErrOverflow
 	}
 
-	return accrualRubles * 100, nil
+	return uint64(accrualRubles * 100), nil
 }
 
 // FormatRubles форматирует копейки в строку с рублями

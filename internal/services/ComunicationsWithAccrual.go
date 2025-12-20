@@ -16,9 +16,9 @@ import (
 
 // AccrualOrderResponse представляет ответ от accrual системы
 type AccrualOrderResponse struct {
-	Order   string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual *uint64 `json:"accrual,omitempty"`
+	Order   string   `json:"order"`
+	Status  string   `json:"status"`
+	Accrual *float64 `json:"accrual,omitempty"`
 }
 
 // Константы для статусов accrual системы

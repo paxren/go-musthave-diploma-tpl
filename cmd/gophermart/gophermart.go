@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -75,7 +76,7 @@ func main() {
 		<-sigint
 
 		// Получаем сигнал завершения, останавливаем сервер
-		if err := server.Shutdown(nil); err != nil {
+		if err := server.Shutdown(context.TODO()); err != nil {
 			logger.Printf("Ошибка при остановке сервера: %v", err)
 		}
 	}()
