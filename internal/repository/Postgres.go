@@ -35,12 +35,6 @@ func MakePostgresStorage(con string) (*PostgresConnection, error) {
 	}()
 
 	fmt.Println("2")
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		fmt.Printf("driver err! err=%v", err)
-		return nil, err
-	}
-
 	fmt.Println("3")
 
 	// Получаем текущую рабочую директорию
@@ -64,7 +58,7 @@ func MakePostgresStorage(con string) (*PostgresConnection, error) {
 		MigrationsTable: "schema_migrations_gophermart",
 	}
 
-	driver, err = postgres.WithInstance(db, postgresConfig)
+	driver, err := postgres.WithInstance(db, postgresConfig)
 	if err != nil {
 		fmt.Printf("driver err! err=%v", err)
 		return nil, err
