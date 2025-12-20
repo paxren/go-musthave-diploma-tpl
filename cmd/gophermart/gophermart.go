@@ -24,6 +24,11 @@ func main() {
 	fmt.Println()
 	fmt.Println(serverConfig)
 
+	postgresCon, err := repository.MakePostgresStorage(serverConfig.DatabaseURI)
+	if err != nil {
+		panic("посгря не инициализирована")
+	}
+
 	usersStorage := repository.MakeUserMemStorage()
 	ordersStorage := repository.MakeOrderMemStorage()
 	authMidl := handler.MakeAuthorizer(usersStorage)
