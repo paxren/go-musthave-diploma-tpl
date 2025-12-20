@@ -9,34 +9,26 @@ import (
 )
 
 type ServerConfigEnv struct {
-	AccrualSystemAddress HostAddress `env:"ACCRUAL_SYSTEM_ADDRESS,notEmpty"`
+	AccrualSystemAddress string      `env:"ACCRUAL_SYSTEM_ADDRESS,notEmpty"`
 	RunAddress           HostAddress `env:"RUN_ADDRESS,notEmpty"`
 	DatabaseURI          string      `env:"DATABASE_URI,notEmpty"`
 }
 
 type ServerConfig struct {
 	envs                 ServerConfigEnv
-	AccrualSystemAddress HostAddress
+	AccrualSystemAddress string
 	RunAddress           HostAddress
 	DatabaseURI          string
 
-	paramAccrualSystemAddress HostAddress
+	paramAccrualSystemAddress string
 	paramRunAddress           HostAddress
 	paramDatabaseURI          string
 }
 
 func NewServerConfig() *ServerConfig {
-
-	acrual := &HostAddress{
-		Host: "localhost",
-		Port: 8081,
-	}
-
 	return &ServerConfig{
-		RunAddress:           *NewHostAddress(),
-		AccrualSystemAddress: *acrual,
+		RunAddress: *NewHostAddress(),
 	}
-
 }
 
 func (se *ServerConfig) Init() {
@@ -51,10 +43,6 @@ func (se *ServerConfig) Init() {
 	// fmt.Printf("Restore = %v\n", se.Restore)
 	// fmt.Printf("Adress = %v\n", se.Address)
 
-	se.paramAccrualSystemAddress = HostAddress{
-		Host: "localhost",
-		Port: 8081,
-	}
 	se.paramRunAddress = HostAddress{
 		Host: "localhost",
 		Port: 8080,
@@ -62,7 +50,7 @@ func (se *ServerConfig) Init() {
 
 	flag.Var(&se.paramRunAddress, "a", "Net address host:port")
 	flag.StringVar(&se.paramDatabaseURI, "d", "", "db uri")
-	flag.Var(&se.paramAccrualSystemAddress, "r", "Net accrual address host:port")
+	flag.StringVar(&se.paramAccrualSystemAddress, "r", "http://localhost:8081", "Net accrual address http://host:port")
 
 	// fmt.Println("======AFTER PARAMS PARSE-----")
 	// fmt.Printf("paramStoreInterval = %v\n", se.paramStoreInterval)
@@ -131,10 +119,11 @@ func (se *ServerConfig) Parse() {
 					// Проверяем, если ошибка связана с RUN_ADDRESS
 					if strings.Contains(v.Error(), "RUN_ADDRESS") {
 						problemVars["RUN_ADDRESS"] = true
-					} else {
-						// Иначе считаем, что ошибка связана с ACCRUAL_SYSTEM_ADDRESS
-						problemVars["ACCRUAL_SYSTEM_ADDRESS"] = true
 					}
+					// else {
+					// 	// Иначе считаем, что ошибка связана с ACCRUAL_SYSTEM_ADDRESS
+					// 	problemVars["ACCRUAL_SYSTEM_ADDRESS"] = true
+					// }
 				}
 
 				//fmt.Println("----------------------")
@@ -189,9 +178,4 @@ func (se *ServerConfig) Parse() {
 	// fmt.Printf("FileStoragePath = %v\n", se.FileStoragePath)
 	// fmt.Printf("Restore = %v\n", se.Restore)
 	// fmt.Printf("Adress = %v\n", se.Address)
-}
-
-// GetAccrualSystemURL возвращает полный URL для системы начисления баллов с схемой http
-func (se *ServerConfig) GetAccrualSystemURL() string {
-	return "http://" + se.AccrualSystemAddress.String()
 }

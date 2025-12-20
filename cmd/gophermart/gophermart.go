@@ -42,7 +42,7 @@ func main() {
 	r := chi.NewRouter()
 
 	// Создаем клиент для взаимодействия с accrual системой
-	accrualClient := services.NewAccrualClient(serverConfig.GetAccrualSystemURL())
+	accrualClient := services.NewAccrualClient(serverConfig.AccrualSystemAddress)
 
 	// Создаем логгер для сервиса опроса
 	logger := log.New(os.Stdout, "ACCURAL: ", log.LstdFlags)
