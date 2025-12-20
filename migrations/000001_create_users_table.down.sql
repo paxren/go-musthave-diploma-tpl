@@ -1,4 +1,4 @@
 --
 -- Удаление таблицы пользователей
--- Откат миграции создания таблицы users
-DROP TABLE IF EXISTS users;
+-- Откат миграции создания таблицы gophermart_users
+DROP TABLE IF EXISTS gophermart_users;

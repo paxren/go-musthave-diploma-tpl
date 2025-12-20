@@ -29,8 +29,8 @@ func main() {
 		panic("посгря не инициализирована")
 	}
 
-	usersStorage := repository.MakeUserMemStorage()
-	ordersStorage := repository.MakeOrderMemStorage()
+	usersStorage := repository.MakeUserPostgresStorage(postgresCon)
+	ordersStorage := repository.MakeOrderPostgresStorage(postgresCon)
 	authMidl := handler.MakeAuthorizer(usersStorage)
 	handlerv := handler.NewHandler(usersStorage, ordersStorage)
 	r := chi.NewRouter()
