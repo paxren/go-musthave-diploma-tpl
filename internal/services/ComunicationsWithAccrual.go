@@ -235,7 +235,7 @@ func (s *AccrualPollingService) Start() {
 	s.logger.Println("Запуск сервиса опроса статусов заказов")
 
 	// Создаем тикер с интервалом 5 секунд
-	s.ticker = time.NewTicker(5 * time.Second)
+	s.ticker = time.NewTicker(1 * time.Second)
 
 	go func() {
 		for {
