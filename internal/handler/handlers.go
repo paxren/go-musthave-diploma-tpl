@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/paxren/go-musthave-diploma-tpl/internal/models"
+	"github.com/paxren/go-musthave-diploma-tpl/internal/money"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/repository"
 )
 
@@ -210,8 +211,8 @@ func (h Handler) GetBalance(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	exportBalance := BalanceExport{
-		Current:   (float64(balance.Current) / 100),
-		Withdrawn: (float64(balance.Withdrawn) / 100),
+		Current:   money.KopecksToRubles(balance.Current),
+		Withdrawn: money.KopecksToRubles(balance.Withdrawn),
 	}
 
 	balanceJSON, err := json.Marshal(exportBalance)
@@ -227,15 +228,15 @@ func (h Handler) GetBalance(res http.ResponseWriter, req *http.Request) {
 
 // WithdrawRequest представляет запрос на списание баллов
 type WithdrawRequest struct {
-	Order string `json:"order"`
-	Sum   uint64 `json:"sum"`
+	Order string  `json:"order"`
+	Sum   float64 `json:"sum"`
 }
 
 // WithdrawResponse представляет ответ с информацией о выводе средств
 type WithdrawResponse struct {
-	Order       string `json:"order"`
-	Sum         uint64 `json:"sum"`
-	ProcessedAt string `json:"processed_at"`
+	Order       string  `json:"order"`
+	Sum         float64 `json:"sum"`
+	ProcessedAt string  `json:"processed_at"`
 }
 
 // WithdrawBalance обрабатывает запрос на списание баллов
@@ -282,8 +283,11 @@ func (h Handler) WithdrawBalance(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Конвертируем сумму из рублей в копейки для хранения в БД с корректным округлением
+	sumInKopecks := money.RublesToKopecks(withdrawReq.Sum)
+
 	// Создаем заказ на списание
-	withdrawOrder := *models.MakeWithdraw(*userDB, withdrawReq.Order, withdrawReq.Sum)
+	withdrawOrder := *models.MakeWithdraw(*userDB, withdrawReq.Order, sumInKopecks)
 
 	// Добавляем заказ в базу данных
 	err = h.orderRepo.AddOrder(*userDB, withdrawOrder)
@@ -335,7 +339,7 @@ func (h Handler) GetWithdrawals(res http.ResponseWriter, req *http.Request) {
 	for _, withdrawal := range withdrawals {
 		withdrawalsResponse = append(withdrawalsResponse, WithdrawResponse{
 			Order:       withdrawal.OrderID,
-			Sum:         withdrawal.Value,
+			Sum:         money.KopecksToRubles(withdrawal.Value), // Конвертируем из копеек в рубли
 			ProcessedAt: withdrawal.Date,
 		})
 	}

@@ -203,20 +203,20 @@ curl -v -X POST 'http://localhost:8080/api/user/login' \
 ```bash
 curl -v -X POST 'http://localhost:8080/api/user/orders' \
   -H "Content-Type: text/plain" \
-  -H "User: user" \
+  -H "Authorization: user" \
   -d '12345678903'
 ```
 
 #### Получение списка заказов
 ```bash
 curl -v -X GET 'http://localhost:8080/api/user/orders' \
-  -H "User: user"
+  -H "Authorization: user"
 ```
 
 #### Получение баланса
 ```bash
 curl -v -X GET 'http://localhost:8080/api/user/balance' \
-  -H "User: user"
+  -H "Authorization: user"
 ```
 
 ### Тестирование взаимодействия с accrual

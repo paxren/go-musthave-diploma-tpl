@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/paxren/go-musthave-diploma-tpl/internal/models"
+	"github.com/paxren/go-musthave-diploma-tpl/internal/money"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/repository"
 )
 
@@ -309,10 +310,17 @@ func (s *AccrualPollingService) processOrder(order models.Order) {
 
 	s.logger.Printf("Статус заказа %s изменился с %s на %s", order.OrderID, order.Status, accrualResponse.Status)
 
-	// Определяем значение для начисления
+	// Определяем значение для начисления (конвертируем из рублей в копейки)
 	var accrualValue uint64 = 0
 	if accrualResponse.Accrual != nil {
-		accrualValue = *accrualResponse.Accrual
+		// Accrual возвращает сумму в рублях, конвертируем в копейки для хранения в БД
+		// Используем безопасную конвертацию с проверкой на переполнение
+		var err error
+		accrualValue, err = money.AccrualToKopecks(*accrualResponse.Accrual)
+		if err != nil {
+			s.logger.Printf("Ошибка при конвертации суммы начисления для заказа %s: %v", order.OrderID, err)
+			return
+		}
 	}
 
 	// Обновляем статус и значение заказа в базе данных
