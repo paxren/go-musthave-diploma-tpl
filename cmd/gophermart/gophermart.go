@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -23,6 +25,13 @@ func init() {
 	serverConfig.Init()
 }
 
+// fatalError логирует критическую ошибку и завершает приложение с кодом 1
+func fatalError(logger *slog.Logger, message string, err error) {
+	logger.Error(message, "error", err)
+	fmt.Fprintf(os.Stderr, "FATAL: %s: %v\n", message, err)
+	os.Exit(1)
+}
+
 func main() {
 	//обработка сигтерм, по статье https://habr.com/ru/articles/908344/
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -40,8 +49,7 @@ func main() {
 
 	postgresCon, err := repository.MakePostgresStorage(serverConfig.DatabaseURI)
 	if err != nil {
-		appLogger.Error("PostgreSQL не инициализирована", "error", err)
-		panic("посгря не инициализирована")
+		fatalError(appLogger, "PostgreSQL не инициализирована", err)
 	}
 	finish = append(finish, postgresCon.Close)
 
@@ -79,16 +87,11 @@ func main() {
 	go func() {
 		err = server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			appLogger.Error("Ошибка при запуске сервера", "error", err)
-			panic(err)
+			fatalError(appLogger, "Ошибка при запуске сервера", err)
 		}
-
 	}()
 
 	appLogger.Info("Запуск сервера", "address", serverConfig.RunAddress.String())
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		appLogger.Error("Ошибка при запуске сервера", "error", err)
-	}
 
 	//обработка сигтерм TODO добработать или переработать после понимания контекста и др
 	<-rootCtx.Done()
