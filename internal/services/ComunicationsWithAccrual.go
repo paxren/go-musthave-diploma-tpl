@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -33,7 +33,7 @@ const (
 type AccrualClient struct {
 	baseURL    string
 	httpClient *http.Client
-	logger     *log.Logger
+	logger     *slog.Logger
 }
 
 // NewAccrualClient создает новый экземпляр AccrualClient
@@ -43,12 +43,18 @@ func NewAccrualClient(baseURL string) *AccrualClient {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		logger: log.New(io.Discard, "", log.LstdFlags), // По умолчанию без логирования
+		logger: slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelInfo})), // По умолчанию без логирования
 	}
 }
 
-// SetLogger устанавливает логгер для клиента
-func (c *AccrualClient) SetLogger(logger *log.Logger) {
+// SetLogger устанавливает логгер для клиента (для обратной совместимости)
+func (c *AccrualClient) SetLogger(logger interface{}) {
+	// Этот метод оставлен для обратной совместимости, но не рекомендуется к использованию
+	// Вместо него используйте SetSlogLogger
+}
+
+// SetSlogLogger устанавливает slog логгер для клиента
+func (c *AccrualClient) SetSlogLogger(logger *slog.Logger) {
 	c.logger = logger
 }
 
@@ -63,8 +69,11 @@ func (c *AccrualClient) GetOrderInfo(orderNumber string) (*AccrualOrderResponse,
 		if attempt > 0 {
 			// Экспоненциальный backoff с jitter
 			delay := baseRetryDelay * time.Duration(1<<uint(attempt-1))
-			c.logger.Printf("Повторная попытка запроса заказа %s (попытка %d/%d) через %v",
-				orderNumber, attempt+1, maxRetries, delay)
+			c.logger.Info("Повторная попытка запроса заказа",
+				"order_number", orderNumber,
+				"attempt", attempt+1,
+				"max_attempts", maxRetries,
+				"delay", delay)
 			time.Sleep(delay)
 		}
 
@@ -79,7 +88,8 @@ func (c *AccrualClient) GetOrderInfo(orderNumber string) (*AccrualOrderResponse,
 		if isRateLimitError(err) {
 			// Извлекаем время ожидания из ошибки, если возможно
 			if retryAfter := extractRetryAfter(err); retryAfter > 0 {
-				c.logger.Printf("Ожидание %d секунд перед повторной попыткой из-за ограничения частоты", retryAfter)
+				c.logger.Info("Ожидание перед повторной попыткой из-за ограничения частоты",
+					"retry_after_seconds", retryAfter)
 				time.Sleep(time.Duration(retryAfter) * time.Second)
 				continue
 			}
@@ -98,11 +108,15 @@ func (c *AccrualClient) GetOrderInfo(orderNumber string) (*AccrualOrderResponse,
 func (c *AccrualClient) getOrderInfoOnce(orderNumber string) (*AccrualOrderResponse, error) {
 	url := fmt.Sprintf("%s/api/orders/%s", c.baseURL, orderNumber)
 
-	c.logger.Printf("Запрос информации о заказе %s из accrual системы: %s", orderNumber, url)
+	c.logger.Info("Запрос информации о заказе из accrual системы",
+		"order_number", orderNumber,
+		"url", url)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
-		c.logger.Printf("Ошибка при выполнении запроса к accrual системе: %v", err)
+		c.logger.Error("Ошибка при выполнении запроса к accrual системе",
+			"error", err,
+			"order_number", orderNumber)
 		return nil, fmt.Errorf("ошибка при выполнении запроса: %w", err)
 	}
 	defer resp.Body.Close()
@@ -111,17 +125,21 @@ func (c *AccrualClient) getOrderInfoOnce(orderNumber string) (*AccrualOrderRespo
 	case http.StatusOK:
 		var accrualResponse AccrualOrderResponse
 		if err := json.NewDecoder(resp.Body).Decode(&accrualResponse); err != nil {
-			c.logger.Printf("Ошибка при декодировании ответа от accrual системы: %v", err)
+			c.logger.Error("Ошибка при декодировании ответа от accrual системы",
+				"error", err,
+				"order_number", orderNumber)
 			return nil, fmt.Errorf("ошибка при декодировании ответа: %w", err)
 		}
 
-		c.logger.Printf("Получен ответ от accrual системы для заказа %s: статус=%s, accrual=%v",
-			orderNumber, accrualResponse.Status, accrualResponse.Accrual)
+		c.logger.Info("Получен ответ от accrual системы",
+			"order_number", orderNumber,
+			"status", accrualResponse.Status,
+			"accrual", accrualResponse.Accrual)
 
 		return &accrualResponse, nil
 
 	case http.StatusNoContent:
-		c.logger.Printf("Заказ %s не найден в accrual системе", orderNumber)
+		c.logger.Info("Заказ не найден в accrual системе", "order_number", orderNumber)
 		return nil, fmt.Errorf("заказ не найден в accrual системе")
 
 	case http.StatusTooManyRequests:
@@ -129,19 +147,26 @@ func (c *AccrualClient) getOrderInfoOnce(orderNumber string) (*AccrualOrderRespo
 		retryAfter := resp.Header.Get("Retry-After")
 		if retryAfter != "" {
 			if seconds, err := strconv.Atoi(retryAfter); err == nil {
-				c.logger.Printf("Превышен лимит запросов к accrual системе, повтор через %d секунд", seconds)
+				c.logger.Warn("Превышен лимит запросов к accrual системе",
+					"retry_after_seconds", seconds,
+					"order_number", orderNumber)
 				return nil, fmt.Errorf("превышен лимит запросов, повтор через %d секунд", seconds)
 			}
 		}
-		c.logger.Printf("Превышен лимит запросов к accrual системе")
+		c.logger.Warn("Превышен лимит запросов к accrual системе",
+			"order_number", orderNumber)
 		return nil, fmt.Errorf("превышен лимит запросов к accrual системе")
 
 	case http.StatusInternalServerError:
-		c.logger.Printf("Внутренняя ошибка сервера accrual системы при запросе заказа %s", orderNumber)
+		c.logger.Error("Внутренняя ошибка сервера accrual системы",
+			"order_number", orderNumber,
+			"status_code", resp.StatusCode)
 		return nil, fmt.Errorf("внутренняя ошибка сервера accrual системы")
 
 	default:
-		c.logger.Printf("Неожиданный статус код от accrual системы: %d", resp.StatusCode)
+		c.logger.Error("Неожиданный статус код от accrual системы",
+			"order_number", orderNumber,
+			"status_code", resp.StatusCode)
 		return nil, fmt.Errorf("неожиданный статус код: %d", resp.StatusCode)
 	}
 }
@@ -209,7 +234,7 @@ func findSubstring(s, substr string) int {
 type AccrualPollingService struct {
 	accrualClient *AccrualClient
 	orderRepo     repository.OrderBase
-	logger        *log.Logger
+	logger        *slog.Logger
 	ticker        *time.Ticker
 	done          chan bool
 }
@@ -219,22 +244,28 @@ func NewAccrualPollingService(accrualClient *AccrualClient, orderRepo repository
 	return &AccrualPollingService{
 		accrualClient: accrualClient,
 		orderRepo:     orderRepo,
-		logger:        log.New(io.Discard, "", log.LstdFlags), // По умолчанию без логирования
+		logger:        slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelInfo})), // По умолчанию без логирования
 		done:          make(chan bool),
 	}
 }
 
-// SetLogger устанавливает логгер для сервиса опроса
-func (s *AccrualPollingService) SetLogger(logger *log.Logger) {
+// SetLogger устанавливает логгер для сервиса опроса (для обратной совместимости)
+func (s *AccrualPollingService) SetLogger(logger interface{}) {
+	// Этот метод оставлен для обратной совместимости, но не рекомендуется к использованию
+	// Вместо него используйте SetSlogLogger
+}
+
+// SetSlogLogger устанавливает slog логгер для сервиса опроса
+func (s *AccrualPollingService) SetSlogLogger(logger *slog.Logger) {
 	s.logger = logger
-	s.accrualClient.SetLogger(logger)
+	s.accrualClient.SetSlogLogger(logger)
 }
 
 // Start запускает сервис опроса статусов
 func (s *AccrualPollingService) Start() {
-	s.logger.Println("Запуск сервиса опроса статусов заказов")
+	s.logger.Info("Запуск сервиса опроса статусов заказов")
 
-	// Создаем тикер с интервалом 5 секунд
+	// Создаем тикер с интервалом 1 секунды
 	s.ticker = time.NewTicker(1 * time.Second)
 
 	go func() {
@@ -243,7 +274,7 @@ func (s *AccrualPollingService) Start() {
 			case <-s.ticker.C:
 				s.pollOrders()
 			case <-s.done:
-				s.logger.Println("Остановка сервиса опроса статусов заказов")
+				s.logger.Info("Остановка сервиса опроса статусов заказов")
 				return
 			}
 		}
@@ -266,49 +297,58 @@ func (s *AccrualPollingService) Stop() {
 
 // pollOrders выполняет опрос заказов со статусами NEW и PROCESSING
 func (s *AccrualPollingService) pollOrders() {
-	s.logger.Println("Начало опроса статусов заказов")
+	s.logger.Debug("Начало опроса статусов заказов")
 
 	// Получаем заказы со статусами NEW и PROCESSING
 	statuses := []string{models.OrderStatusNew, models.OrderStatusProcessing}
 	orders, err := s.orderRepo.GetOrdersWithStatuses(statuses)
 	if err != nil {
-		s.logger.Printf("Ошибка при получении заказов для опроса: %v", err)
+		s.logger.Error("Ошибка при получении заказов для опроса", "error", err)
 		return
 	}
 
 	if len(orders) == 0 {
-		s.logger.Println("Нет заказов для опроса")
+		s.logger.Debug("Нет заказов для опроса")
 		return
 	}
 
-	s.logger.Printf("Найдено %d заказов для опроса", len(orders))
+	s.logger.Info("Найдено заказов для опроса", "count", len(orders))
 
 	// Обрабатываем каждый заказ
 	for _, order := range orders {
 		s.processOrder(order)
 	}
 
-	s.logger.Println("Завершение опроса статусов заказов")
+	s.logger.Debug("Завершение опроса статусов заказов")
 }
 
 // processOrder обрабатывает один заказ
 func (s *AccrualPollingService) processOrder(order models.Order) {
-	s.logger.Printf("Обработка заказа %s со статусом %s", order.OrderID, order.Status)
+	s.logger.Info("Обработка заказа",
+		"order_id", order.OrderID,
+		"status", order.Status)
 
 	// Получаем информацию о заказе из accrual системы
 	accrualResponse, err := s.accrualClient.GetOrderInfo(order.OrderID)
 	if err != nil {
-		s.logger.Printf("Ошибка при получении информации о заказе %s: %v", order.OrderID, err)
+		s.logger.Error("Ошибка при получении информации о заказе",
+			"error", err,
+			"order_id", order.OrderID)
 		return
 	}
 
 	// Проверяем, изменился ли статус
 	if accrualResponse.Status == order.Status {
-		s.logger.Printf("Статус заказа %s не изменился: %s", order.OrderID, order.Status)
+		s.logger.Debug("Статус заказа не изменился",
+			"order_id", order.OrderID,
+			"status", order.Status)
 		return
 	}
 
-	s.logger.Printf("Статус заказа %s изменился с %s на %s", order.OrderID, order.Status, accrualResponse.Status)
+	s.logger.Info("Статус заказа изменился",
+		"order_id", order.OrderID,
+		"old_status", order.Status,
+		"new_status", accrualResponse.Status)
 
 	// Определяем значение для начисления (конвертируем из рублей в копейки)
 	var accrualValue uint64 = 0
@@ -318,7 +358,10 @@ func (s *AccrualPollingService) processOrder(order models.Order) {
 		var err error
 		accrualValue, err = money.AccrualToKopecks(*accrualResponse.Accrual)
 		if err != nil {
-			s.logger.Printf("Ошибка при конвертации суммы начисления для заказа %s: %v", order.OrderID, err)
+			s.logger.Error("Ошибка при конвертации суммы начисления",
+				"error", err,
+				"order_id", order.OrderID,
+				"accrual", *accrualResponse.Accrual)
 			return
 		}
 	}
@@ -326,9 +369,16 @@ func (s *AccrualPollingService) processOrder(order models.Order) {
 	// Обновляем статус и значение заказа в базе данных
 	err = s.orderRepo.UpdateOrderStatusAndValue(order.OrderID, accrualResponse.Status, accrualValue)
 	if err != nil {
-		s.logger.Printf("Ошибка при обновлении статуса заказа %s: %v", order.OrderID, err)
+		s.logger.Error("Ошибка при обновлении статуса заказа",
+			"error", err,
+			"order_id", order.OrderID,
+			"status", accrualResponse.Status,
+			"accrual_value", accrualValue)
 		return
 	}
 
-	s.logger.Printf("Заказ %s успешно обновлен: статус=%s, accrual=%d", order.OrderID, accrualResponse.Status, accrualValue)
+	s.logger.Info("Заказ успешно обновлен",
+		"order_id", order.OrderID,
+		"status", accrualResponse.Status,
+		"accrual_value", accrualValue)
 }

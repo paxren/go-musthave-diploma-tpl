@@ -3,15 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/config"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/handler"
+	"github.com/paxren/go-musthave-diploma-tpl/internal/logger"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/repository"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/services"
 )
@@ -35,8 +34,13 @@ func main() {
 	fmt.Println()
 	fmt.Println(serverConfig)
 
+	// Создаем и устанавливаем логгер по умолчанию
+	appLogger := logger.New()
+	logger.SetDefault(appLogger)
+
 	postgresCon, err := repository.MakePostgresStorage(serverConfig.DatabaseURI)
 	if err != nil {
+		appLogger.Error("PostgreSQL не инициализирована", "error", err)
 		panic("посгря не инициализирована")
 	}
 	finish = append(finish, postgresCon.Close)
@@ -49,14 +53,11 @@ func main() {
 
 	// Создаем клиент для взаимодействия с accrual системой
 	accrualClient := services.NewAccrualClient(serverConfig.AccrualSystemAddress)
-
-	// Создаем логгер для сервиса опроса
-	logger := log.New(os.Stdout, "ACCURAL: ", log.LstdFlags)
-	accrualClient.SetLogger(logger)
+	accrualClient.SetSlogLogger(appLogger)
 
 	// Создаем сервис опроса статусов заказов
 	pollingService := services.NewAccrualPollingService(accrualClient, ordersStorage)
-	pollingService.SetLogger(logger)
+	pollingService.SetSlogLogger(appLogger)
 
 	// Запускаем сервис опроса
 	pollingService.Start()
@@ -78,21 +79,31 @@ func main() {
 	go func() {
 		err = server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
+			appLogger.Error("Ошибка при запуске сервера", "error", err)
 			panic(err)
 		}
 
 	}()
 
-	logger.Printf("Запуск сервера на адресе %s", serverConfig.RunAddress.String())
+	appLogger.Info("Запуск сервера", "address", serverConfig.RunAddress.String())
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Printf("Ошибка при запуске сервера: %v", err)
+		appLogger.Error("Ошибка при запуске сервера", "error", err)
 	}
 
 	//обработка сигтерм TODO добработать или переработать после понимания контекста и др
 	<-rootCtx.Done()
+	appLogger.Info("Получен сигнал завершения, остановка сервера")
 	stop()
-	server.Shutdown(context.Background())
-	for _, f := range finish {
-		f()
+
+	if err := server.Shutdown(context.Background()); err != nil {
+		appLogger.Error("Ошибка при остановке сервера", "error", err)
 	}
+
+	for _, f := range finish {
+		if err := f(); err != nil {
+			appLogger.Error("Ошибка при выполнении финализатора", "error", err)
+		}
+	}
+
+	appLogger.Info("Сервер успешно остановлен")
 }

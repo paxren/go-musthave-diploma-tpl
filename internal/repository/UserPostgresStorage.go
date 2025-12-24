@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -37,6 +38,9 @@ func checkPassword(password, hash string) error {
 }
 
 func (ps *UserPostgresStorage) GetUser(login string) *models.User {
+	logger := slog.Default()
+	logger.Debug("Получение пользователя", "login", login)
+
 	var user models.User
 	var passwordHash string
 
@@ -45,33 +49,35 @@ func (ps *UserPostgresStorage) GetUser(login string) *models.User {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			logger.Debug("Пользователь не найден", "login", login)
 			return nil
 		}
-		// В случае других ошибок базы данных, также возвращаем nil
-		// В реальном приложении здесь может быть логирование ошибки
+		logger.Error("Ошибка при получении пользователя", "login", login, "error", err)
 		return nil
 	}
 
 	// В поле Password не храним хеш, так как оно используется только для аутентификации
 	user.Password = ""
 
+	logger.Debug("Пользователь успешно получен", "login", login, "user_id", user.UserID)
 	return &user
 }
 
 func (ps *UserPostgresStorage) RegisterUser(user models.User) error {
-	fmt.Printf("RegisterUser: попытка регистрации пользователя %s\n", user.Login)
+	logger := slog.Default()
+	logger.Info("Попытка регистрации пользователя", "login", user.Login)
 
 	// Проверяем, существует ли пользователь с таким логином
 	existingUser := ps.GetUser(user.Login)
 	if existingUser != nil {
-		fmt.Printf("RegisterUser: пользователь %s уже существует\n", user.Login)
+		logger.Warn("Пользователь уже существует", "login", user.Login)
 		return ErrUserExist
 	}
 
 	// Хешируем пароль
 	hashedPassword, err := hashPassword(user.Password)
 	if err != nil {
-		fmt.Printf("RegisterUser: ошибка хеширования пароля: %v\n", err)
+		logger.Error("Ошибка хеширования пароля", "login", user.Login, "error", err)
 		return fmt.Errorf("ошибка хеширования пароля: %w", err)
 	}
 
@@ -81,16 +87,16 @@ func (ps *UserPostgresStorage) RegisterUser(user models.User) error {
 	err = ps.db.db.QueryRow(query, user.Login, hashedPassword).Scan(&userID)
 
 	if err != nil {
-		fmt.Printf("RegisterUser: ошибка при вставке пользователя: %v\n", err)
+		logger.Error("Ошибка при вставке пользователя", "login", user.Login, "error", err)
 		// Проверяем ошибку уникальности ограничения (если пользователь уже существует)
 		if isUniqueViolationError(err) {
-			fmt.Printf("RegisterUser: нарушение уникальности ограничения для пользователя %s\n", user.Login)
+			logger.Warn("Нарушение уникальности ограничения для пользователя", "login", user.Login)
 			return ErrUserExist
 		}
 		return fmt.Errorf("ошибка при регистрации пользователя: %w", err)
 	}
 
-	fmt.Printf("RegisterUser: пользователь %s успешно зарегистрирован с ID %d\n", user.Login, userID)
+	logger.Info("Пользователь успешно зарегистрирован", "login", user.Login, "user_id", userID)
 	// Устанавливаем ID пользователя
 	//user.UserID = &userID
 
@@ -98,9 +104,13 @@ func (ps *UserPostgresStorage) RegisterUser(user models.User) error {
 }
 
 func (ps *UserPostgresStorage) LoginUser(user models.User) error {
+	logger := slog.Default()
+	logger.Debug("Попытка входа пользователя", "login", user.Login)
+
 	// Получаем пользователя из базы данных
 	dbUser := ps.GetUser(user.Login)
 	if dbUser == nil {
+		logger.Warn("Пользователь не найден", "login", user.Login)
 		return ErrBadLogin
 	}
 
@@ -111,8 +121,10 @@ func (ps *UserPostgresStorage) LoginUser(user models.User) error {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			logger.Warn("Пользователь не найден в базе данных", "login", user.Login)
 			return ErrBadLogin
 		}
+		logger.Error("Ошибка при аутентификации пользователя", "login", user.Login, "error", err)
 		return fmt.Errorf("ошибка при аутентификации пользователя: %w", err)
 	}
 
@@ -121,11 +133,14 @@ func (ps *UserPostgresStorage) LoginUser(user models.User) error {
 	if err != nil {
 		// Если пароль не совпадает, возвращаем ошибку аутентификации
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			logger.Warn("Неверный пароль", "login", user.Login)
 			return ErrBadLogin
 		}
+		logger.Error("Ошибка при проверке пароля", "login", user.Login, "error", err)
 		return fmt.Errorf("ошибка при проверке пароля: %w", err)
 	}
 
+	logger.Info("Пользователь успешно авторизован", "login", user.Login)
 	return nil
 }
 

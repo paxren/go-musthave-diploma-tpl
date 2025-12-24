@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
+	"log/slog"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -19,11 +19,12 @@ type PostgresConnection struct {
 }
 
 func MakePostgresStorage(con string) (*PostgresConnection, error) {
+	logger := slog.Default()
 
-	fmt.Println("1")
+	logger.Info("Подключение к PostgreSQL", "step", 1)
 	db, err := sql.Open("pgx", con)
 	if err != nil {
-		fmt.Printf("err=%v", err)
+		logger.Error("Ошибка при открытии соединения с PostgreSQL", "error", err)
 		return nil, err
 	}
 	defer func() {
@@ -32,7 +33,7 @@ func MakePostgresStorage(con string) (*PostgresConnection, error) {
 		}
 	}()
 
-	fmt.Println("2")
+	logger.Info("Создание конфигурации для миграций", "step", 2)
 	// Создаем конфигурацию для драйвера PostgreSQL с кастомным именем таблицы миграций
 	postgresConfig := &postgres.Config{
 		MigrationsTable: "schema_migrations_gophermart",
@@ -40,39 +41,48 @@ func MakePostgresStorage(con string) (*PostgresConnection, error) {
 
 	driver, err := postgres.WithInstance(db, postgresConfig)
 	if err != nil {
-		fmt.Printf("driver err! err=%v", err)
+		logger.Error("Ошибка при создании конфигурации для миграций", "error", err)
 		return nil, err
 	}
 
-	fmt.Println("3")
+	logger.Info("Инициализация миграций", "step", 3)
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://./migrations",
 		"postgres", driver)
 	if err != nil {
-		fmt.Printf("migration err! err=%v", err)
+		logger.Error("Ошибка при инициализации миграций", "error", err)
 		return nil, err
 	}
-	fmt.Println("4")
 
+	logger.Info("Применение миграций", "step", 4)
 	err = m.Up()
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		fmt.Printf("Ошибка при поднятии миграций: %v\n", err)
+		logger.Error("Ошибка при применении миграций", "error", err)
 		return nil, err
 	}
 
-	fmt.Println("5")
+	logger.Info("Проверка соединения с базой данных", "step", 5)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	if err = db.PingContext(ctx); err != nil {
-		fmt.Printf("err=%v", err)
+		logger.Error("Ошибка при проверке соединения с базой данных", "error", err)
 		return nil, err
 	}
 
+	logger.Info("PostgreSQL успешно инициализирован")
 	return &PostgresConnection{db: db}, nil
 }
 
 func (ps *PostgresConnection) Close() error {
+	logger := slog.Default()
+	logger.Info("Закрытие соединения с PostgreSQL")
 
-	ps.db.Close()
+	err := ps.db.Close()
+	if err != nil {
+		logger.Error("Ошибка при закрытии соединения с PostgreSQL", "error", err)
+		return err
+	}
+
+	logger.Info("Соединение с PostgreSQL успешно закрыто")
 	return nil
 }

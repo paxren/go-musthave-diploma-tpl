@@ -36,7 +36,6 @@ func (st *OrderMemStorage) AddOrder(user models.User, order models.Order) error 
 	}
 
 	for _, v := range orders {
-		//fmt.Printf("z1 %s %s %v \n", v.OrderID, order.OrderID, v.OrderID == order.OrderID)
 		if v.OrderID == order.OrderID {
 			return ErrOrderExistThisUser
 		}
@@ -44,7 +43,6 @@ func (st *OrderMemStorage) AddOrder(user models.User, order models.Order) error 
 
 	for _, list := range st.orders {
 		for _, v := range list {
-			//fmt.Printf("z2 %s %s %v \n", v.OrderID, order.OrderID, v.OrderID == order.OrderID)
 			if v.OrderID == order.OrderID {
 				return ErrOrderExistAnotherUser
 			}
