@@ -73,18 +73,9 @@ func (h Handler) RegisterUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Отправляем токен в теле ответа
-	res.Header().Set("Content-Type", "application/json")
+	// Устанавливаем токен в заголовок Authorization
+	res.Header().Set("Authorization", token)
 	res.WriteHeader(http.StatusOK)
-
-	authResponse := AuthResponse{
-		Token: token,
-	}
-
-	if err := json.NewEncoder(res).Encode(authResponse); err != nil {
-		http.Error(res, "ошибка при отправке ответа", http.StatusInternalServerError)
-		return
-	}
 }
 
 // LoginUser обрабатывает авторизацию пользователя
@@ -114,16 +105,7 @@ func (h Handler) LoginUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Отправляем токен в теле ответа
-	res.Header().Set("Content-Type", "application/json")
+	// Устанавливаем токен в заголовок Authorization
+	res.Header().Set("Authorization", token)
 	res.WriteHeader(http.StatusOK)
-
-	authResponse := AuthResponse{
-		Token: token,
-	}
-
-	if err := json.NewEncoder(res).Encode(authResponse); err != nil {
-		http.Error(res, "ошибка при отправке ответа", http.StatusInternalServerError)
-		return
-	}
 }

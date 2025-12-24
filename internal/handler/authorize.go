@@ -31,14 +31,20 @@ func (auth *authorizer) AuthMiddleware(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Проверяем формат заголовка: Bearer <token>
+		var tokenString string
+
+		// Проверяем формат заголовка: Bearer <token> или просто <token>
 		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		if len(tokenParts) == 2 && tokenParts[0] == "Bearer" {
+			// Формат Bearer <token>
+			tokenString = tokenParts[1]
+		} else if len(tokenParts) == 1 {
+			// Формат просто <token> (обратная совместимость)
+			tokenString = tokenParts[0]
+		} else {
 			http.Error(res, "неверный формат заголовка авторизации", http.StatusUnauthorized)
 			return
 		}
-
-		tokenString := tokenParts[1]
 
 		// Валидируем JWT токен
 		claims, err := auth.jwtService.ValidateToken(tokenString)
