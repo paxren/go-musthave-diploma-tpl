@@ -25,6 +25,11 @@ func init() {
 }
 
 func main() {
+	//обработка сигтерм, по статье https://habr.com/ru/articles/908344/
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	finish := make([]func() error, 0, 1)
+
 	serverConfig.Parse()
 
 	fmt.Println()
@@ -34,6 +39,7 @@ func main() {
 	if err != nil {
 		panic("посгря не инициализирована")
 	}
+	finish = append(finish, postgresCon.Close)
 
 	usersStorage := repository.MakeUserPostgresStorage(postgresCon)
 	ordersStorage := repository.MakeOrderPostgresStorage(postgresCon)
@@ -84,5 +90,13 @@ func main() {
 	logger.Printf("Запуск сервера на адресе %s", serverConfig.RunAddress.String())
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Printf("Ошибка при запуске сервера: %v", err)
+	}
+
+	//обработка сигтерм TODO добработать или переработать после понимания контекста и др
+	<-rootCtx.Done()
+	stop()
+	server.Shutdown(context.Background())
+	for _, f := range finish {
+		f()
 	}
 }
