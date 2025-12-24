@@ -47,14 +47,8 @@ func NewAccrualClient(baseURL string) *AccrualClient {
 	}
 }
 
-// SetLogger устанавливает логгер для клиента (для обратной совместимости)
-func (c *AccrualClient) SetLogger(logger interface{}) {
-	// Этот метод оставлен для обратной совместимости, но не рекомендуется к использованию
-	// Вместо него используйте SetSlogLogger
-}
-
-// SetSlogLogger устанавливает slog логгер для клиента
-func (c *AccrualClient) SetSlogLogger(logger *slog.Logger) {
+// SetLogger устанавливает slog логгер для клиента
+func (c *AccrualClient) SetLogger(logger *slog.Logger) {
 	c.logger = logger
 }
 
@@ -249,16 +243,10 @@ func NewAccrualPollingService(accrualClient *AccrualClient, orderRepo repository
 	}
 }
 
-// SetLogger устанавливает логгер для сервиса опроса (для обратной совместимости)
-func (s *AccrualPollingService) SetLogger(logger interface{}) {
-	// Этот метод оставлен для обратной совместимости, но не рекомендуется к использованию
-	// Вместо него используйте SetSlogLogger
-}
-
-// SetSlogLogger устанавливает slog логгер для сервиса опроса
-func (s *AccrualPollingService) SetSlogLogger(logger *slog.Logger) {
+// SetLogger устанавливает slog логгер для сервиса опроса
+func (s *AccrualPollingService) SetLogger(logger *slog.Logger) {
 	s.logger = logger
-	s.accrualClient.SetSlogLogger(logger)
+	s.accrualClient.SetLogger(logger)
 }
 
 // Start запускает сервис опроса статусов

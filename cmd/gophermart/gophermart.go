@@ -53,11 +53,11 @@ func main() {
 
 	// Создаем клиент для взаимодействия с accrual системой
 	accrualClient := services.NewAccrualClient(serverConfig.AccrualSystemAddress)
-	accrualClient.SetSlogLogger(appLogger)
+	accrualClient.SetLogger(appLogger)
 
 	// Создаем сервис опроса статусов заказов
 	pollingService := services.NewAccrualPollingService(accrualClient, ordersStorage)
-	pollingService.SetSlogLogger(appLogger)
+	pollingService.SetLogger(appLogger)
 
 	// Запускаем сервис опроса
 	pollingService.Start()
