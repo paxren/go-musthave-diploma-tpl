@@ -12,6 +12,7 @@ type ServerConfigEnv struct {
 	AccrualSystemAddress string      `env:"ACCRUAL_SYSTEM_ADDRESS,notEmpty"`
 	RunAddress           HostAddress `env:"RUN_ADDRESS,notEmpty"`
 	DatabaseURI          string      `env:"DATABASE_URI,notEmpty"`
+	JWTSecret            string      `env:"JWT_SECRET"`
 }
 
 type ServerConfig struct {
@@ -19,10 +20,12 @@ type ServerConfig struct {
 	AccrualSystemAddress string
 	RunAddress           HostAddress
 	DatabaseURI          string
+	JWTSecret            string
 
 	paramAccrualSystemAddress string
 	paramRunAddress           HostAddress
 	paramDatabaseURI          string
+	paramJWTSecret            string
 }
 
 func NewServerConfig() *ServerConfig {
@@ -40,6 +43,7 @@ func (se *ServerConfig) Init() {
 	flag.Var(&se.paramRunAddress, "a", "Net address host:port")
 	flag.StringVar(&se.paramDatabaseURI, "d", "", "db uri")
 	flag.StringVar(&se.paramAccrualSystemAddress, "r", "http://localhost:8081", "Net accrual address http://host:port")
+	flag.StringVar(&se.paramJWTSecret, "j", "", "JWT secret key")
 }
 
 func (se *ServerConfig) Parse() {
@@ -103,5 +107,13 @@ func (se *ServerConfig) Parse() {
 		se.DatabaseURI = se.envs.DatabaseURI
 	} else {
 		se.DatabaseURI = se.paramDatabaseURI
+	}
+
+	_, ok1 = problemVars["JWT_SECRET"]
+	_, ok2 = problemVars["JWTSecret"]
+	if !ok1 && !ok2 {
+		se.JWTSecret = se.envs.JWTSecret
+	} else {
+		se.JWTSecret = se.paramJWTSecret
 	}
 }

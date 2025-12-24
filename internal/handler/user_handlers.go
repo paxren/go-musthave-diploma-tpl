@@ -59,10 +59,32 @@ func (h Handler) RegisterUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res.Header().Set("Authorization", user.Login)
+	// Получаем пользователя из базы данных для получения ID
+	registeredUser := h.userRepo.GetUser(user.Login)
+	if registeredUser == nil {
+		http.Error(res, "ошибка при получении данных зарегистрированного пользователя", http.StatusInternalServerError)
+		return
+	}
 
+	// Генерируем JWT токен
+	token, err := h.jwtService.GenerateToken(*registeredUser.UserID, registeredUser.Login)
+	if err != nil {
+		http.Error(res, "ошибка при генерации токена", http.StatusInternalServerError)
+		return
+	}
+
+	// Отправляем токен в теле ответа
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 
+	authResponse := AuthResponse{
+		Token: token,
+	}
+
+	if err := json.NewEncoder(res).Encode(authResponse); err != nil {
+		http.Error(res, "ошибка при отправке ответа", http.StatusInternalServerError)
+		return
+	}
 }
 
 // LoginUser обрабатывает авторизацию пользователя
@@ -78,7 +100,30 @@ func (h Handler) LoginUser(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res.Header().Set("Authorization", user.Login)
+	// Получаем пользователя из базы данных для получения ID
+	loggedUser := h.userRepo.GetUser(user.Login)
+	if loggedUser == nil {
+		http.Error(res, "ошибка при получении данных пользователя", http.StatusInternalServerError)
+		return
+	}
 
+	// Генерируем JWT токен
+	token, err := h.jwtService.GenerateToken(*loggedUser.UserID, loggedUser.Login)
+	if err != nil {
+		http.Error(res, "ошибка при генерации токена", http.StatusInternalServerError)
+		return
+	}
+
+	// Отправляем токен в теле ответа
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
+
+	authResponse := AuthResponse{
+		Token: token,
+	}
+
+	if err := json.NewEncoder(res).Encode(authResponse); err != nil {
+		http.Error(res, "ошибка при отправке ответа", http.StatusInternalServerError)
+		return
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/paxren/go-musthave-diploma-tpl/internal/auth"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/config"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/handler"
 	"github.com/paxren/go-musthave-diploma-tpl/internal/logger"
@@ -55,8 +56,12 @@ func main() {
 
 	usersStorage := repository.MakeUserPostgresStorage(postgresCon)
 	ordersStorage := repository.MakeOrderPostgresStorage(postgresCon)
-	authMidl := handler.MakeAuthorizer(usersStorage)
-	handlerv := handler.NewHandler(usersStorage, ordersStorage)
+
+	// Создаем JWT сервис с секретным ключом из конфигурации
+	jwtService := auth.NewJWTService(serverConfig.JWTSecret)
+
+	authMidl := handler.MakeAuthorizer(usersStorage, jwtService)
+	handlerv := handler.NewHandler(usersStorage, ordersStorage, jwtService)
 	r := chi.NewRouter()
 
 	// Создаем клиент для взаимодействия с accrual системой

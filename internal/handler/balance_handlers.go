@@ -16,10 +16,14 @@ import (
 // GetBalance обрабатывает получение текущего баланса пользователя
 func (h Handler) GetBalance(res http.ResponseWriter, req *http.Request) {
 
-	userHeader := req.Header.Get("User")
-	userDB := h.userRepo.GetUser(userHeader)
+	// Получаем пользователя из контекста
+	user, err := GetUserFromContext(req.Context())
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusUnauthorized)
+		return
+	}
 
-	balance, err := h.orderRepo.GetBalance(*userDB)
+	balance, err := h.orderRepo.GetBalance(*user)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
@@ -76,11 +80,10 @@ func (h Handler) WithdrawBalance(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Получаем пользователя из заголовка
-	userHeader := req.Header.Get("User")
-	userDB := h.userRepo.GetUser(userHeader)
-	if userDB == nil {
-		http.Error(res, "пользователь не найден", http.StatusUnauthorized)
+	// Получаем пользователя из контекста
+	user, err := GetUserFromContext(req.Context())
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -88,10 +91,10 @@ func (h Handler) WithdrawBalance(res http.ResponseWriter, req *http.Request) {
 	sumInKopecks := money.RublesToKopecks(withdrawReq.Sum)
 
 	// Создаем заказ на списание
-	withdrawOrder := *models.MakeWithdraw(*userDB, withdrawReq.Order, sumInKopecks)
+	withdrawOrder := *models.MakeWithdraw(*user, withdrawReq.Order, sumInKopecks)
 
 	// Добавляем заказ в базу данных
-	err = h.orderRepo.AddOrder(*userDB, withdrawOrder)
+	err = h.orderRepo.AddOrder(*user, withdrawOrder)
 	if err != nil {
 		if errors.Is(err, repository.ErrIncafitionFunds) {
 			http.Error(res, "на счету недостаточно средств", http.StatusPaymentRequired)
@@ -114,16 +117,15 @@ func (h Handler) WithdrawBalance(res http.ResponseWriter, req *http.Request) {
 
 // GetWithdrawals обрабатывает запрос на получение истории выводов
 func (h Handler) GetWithdrawals(res http.ResponseWriter, req *http.Request) {
-	// Получаем пользователя из заголовка
-	userHeader := req.Header.Get("User")
-	userDB := h.userRepo.GetUser(userHeader)
-	if userDB == nil {
-		http.Error(res, "пользователь не найден", http.StatusUnauthorized)
+	// Получаем пользователя из контекста
+	user, err := GetUserFromContext(req.Context())
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
 	// Получаем историю выводов
-	withdrawals, err := h.orderRepo.GetWithdrawals(*userDB)
+	withdrawals, err := h.orderRepo.GetWithdrawals(*user)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return

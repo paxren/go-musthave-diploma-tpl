@@ -37,9 +37,14 @@ func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	userHeader := req.Header.Get("User")
-	userDB := h.userRepo.GetUser(userHeader)
-	err = h.orderRepo.AddOrder(*userDB, *models.MakeNewOrder(*userDB, orderString))
+	// Получаем пользователя из контекста
+	user, err := GetUserFromContext(req.Context())
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	err = h.orderRepo.AddOrder(*user, *models.MakeNewOrder(*user, orderString))
 	if err != nil {
 		if errors.Is(err, repository.ErrOrderExistThisUser) {
 			res.WriteHeader(http.StatusOK)
@@ -64,10 +69,14 @@ func (h Handler) AddOrder(res http.ResponseWriter, req *http.Request) {
 // GetOrders обрабатывает получение списка заказов пользователя
 func (h Handler) GetOrders(res http.ResponseWriter, req *http.Request) {
 
-	userHeader := req.Header.Get("User")
-	userDB := h.userRepo.GetUser(userHeader)
+	// Получаем пользователя из контекста
+	user, err := GetUserFromContext(req.Context())
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusUnauthorized)
+		return
+	}
 
-	orders, err := h.orderRepo.GetOrders(*userDB, models.OrderType)
+	orders, err := h.orderRepo.GetOrders(*user, models.OrderType)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return

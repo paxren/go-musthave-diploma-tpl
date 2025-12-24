@@ -28,3 +28,8 @@ type WithdrawResponse struct {
 	Sum         float64 `json:"sum"`
 	ProcessedAt string  `json:"processed_at"`
 }
+
+// AuthResponse представляет ответ аутентификации с JWT токеном
+type AuthResponse struct {
+	Token string `json:"token"`
+}
