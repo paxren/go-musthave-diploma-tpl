@@ -43,7 +43,7 @@ func (se *ServerConfig) Init() {
 	flag.Var(&se.paramRunAddress, "a", "Net address host:port")
 	flag.StringVar(&se.paramDatabaseURI, "d", "", "db uri")
 	flag.StringVar(&se.paramAccrualSystemAddress, "r", "http://localhost:8081", "Net accrual address http://host:port")
-	flag.StringVar(&se.paramJWTSecret, "j", "", "JWT secret key")
+	flag.StringVar(&se.paramJWTSecret, "j", "default-secret-key", "JWT secret key")
 }
 
 func (se *ServerConfig) Parse() {
