@@ -75,16 +75,12 @@ func main() {
 		Handler: r,
 	}
 
-	// Настройка graceful shutdown
 	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-		<-sigint
-
-		// Получаем сигнал завершения, останавливаем сервер
-		if err := server.Shutdown(context.TODO()); err != nil {
-			logger.Printf("Ошибка при остановке сервера: %v", err)
+		err = server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			panic(err)
 		}
+
 	}()
 
 	logger.Printf("Запуск сервера на адресе %s", serverConfig.RunAddress.String())
