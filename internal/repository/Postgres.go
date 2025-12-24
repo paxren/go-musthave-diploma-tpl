@@ -54,47 +54,11 @@ func MakePostgresStorage(con string) (*PostgresConnection, error) {
 	}
 	fmt.Println("4")
 
-	// Проверяем текущую версию миграций
-	// version, dirty, err := m.Version()
-	// if err != nil {
-	// 	fmt.Printf("Ошибка при получении версии миграций: %v\n", err)
-	// } else {
-	// 	fmt.Printf("Текущая версия миграций: %d, грязное состояние: %v\n", version, dirty)
-	// }
-
-	// Добавляем вывод о результате миграции
 	err = m.Up()
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		fmt.Printf("Ошибка при поднятии миграций: %v\n", err)
 		return nil, err
 	}
-	// if err != nil {
-	// 	errStr := err.Error()
-	// 	fmt.Printf("Полная ошибка миграции: %s\n", errStr)
-	// 	if errStr == "no change" {
-	// 		fmt.Println("Миграции уже применены")
-	// 	} else if strings.Contains(errStr, "Dirty database version") {
-	// 		fmt.Println("Обнаружено грязное состояние базы данных, пытаемся исправить...")
-	// 		// Принудительно устанавливаем версию на 1, чтобы затем применить миграции 2 и 3
-	// 		err = m.Force(1)
-	// 		if err != nil {
-	// 			fmt.Printf("Ошибка при установке версии 1: %v\n", err)
-	// 			return nil, err
-	// 		}
-	// 		fmt.Println("Версия установлена на 1, применяем миграции заново...")
-	// 		err = m.Up()
-	// 		if err != nil {
-	// 			fmt.Printf("Ошибка при повторном применении миграций: %v\n", err)
-	// 			return nil, err
-	// 		}
-	// 		fmt.Println("Миграции успешно применены после исправления")
-	// 	} else {
-	// 		fmt.Printf("Ошибка при применении миграций: %v\n", err)
-	// 		return nil, err
-	// 	}
-	// } else {
-	// 	fmt.Println("Миграции успешно применены")
-	// }
 
 	fmt.Println("5")
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
